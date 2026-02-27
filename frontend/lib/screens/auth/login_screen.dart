@@ -47,18 +47,19 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 60),
-              // Logo
+              // DUOZZ Logo
               Container(
-                width: 72,
-                height: 72,
+                height: 64,
                 decoration: BoxDecoration(
                   gradient: AppTheme.primaryGradient,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(
-                  Icons.play_circle_outline,
-                  size: 40,
-                  color: Colors.white,
+                child: const Center(
+                  child: Icon(
+                    Icons.play_arrow_rounded,
+                    size: 36,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

@@ -77,46 +77,58 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    // DUOZZ star icon
                     Container(
-                      width: 100,
-                      height: 100,
+                      width: 80,
+                      height: 80,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(24),
+                        color: AppTheme.primaryColor,
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Icon(
-                        Icons.play_circle_outline,
-                        size: 56,
+                        Icons.play_arrow_rounded,
+                        size: 48,
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
+                    // DUOZZ in orange
                     const Text(
-                      'Duozz Flow',
+                      'DUOZZ',
                       style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 48,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.primaryColor,
+                        fontFamily: 'Poppins',
+                        letterSpacing: 4,
+                      ),
+                    ),
+                    const Text(
+                      'FLOW',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w300,
                         color: Colors.white,
                         fontFamily: 'Poppins',
-                        letterSpacing: -0.5,
+                        letterSpacing: 8,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                     Text(
                       'Gestão de equipes de edição',
                       style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.6),
                         fontFamily: 'Poppins',
                         fontWeight: FontWeight.w400,
                       ),
                     ),
                     const SizedBox(height: 48),
                     SizedBox(
-                      width: 32,
-                      height: 32,
+                      width: 28,
+                      height: 28,
                       child: CircularProgressIndicator(
-                        color: Colors.white.withOpacity(0.7),
+                        color: AppTheme.primaryColor,
                         strokeWidth: 2.5,
                       ),
                     ),

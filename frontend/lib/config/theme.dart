@@ -1,61 +1,67 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Brand Colors
-  static const Color primaryColor = Color(0xFF2563EB);
-  static const Color secondaryColor = Color(0xFF7C3AED);
-  static const Color surfaceColor = Color(0xFFF8FAFC);
+  // DUOZZ Brand Colors
+  static const Color primaryColor = Color(0xFFE8490E); // DUOZZ Orange
+  static const Color primaryDark = Color(0xFFC43A08); // Darker orange for pressed states
+  static const Color secondaryColor = Color(0xFF6B6560); // Warm gray from portfolio
+  static const Color surfaceColor = Color(0xFFF5F0E8); // Off-white/cream
   static const Color cardColor = Colors.white;
-  static const Color textPrimary = Color(0xFF1E293B);
-  static const Color textSecondary = Color(0xFF64748B);
-  static const Color textTertiary = Color(0xFF94A3B8);
-  static const Color dividerColor = Color(0xFFE2E8F0);
-  static const Color errorColor = Color(0xFFEF4444);
-  static const Color successColor = Color(0xFF22C55E);
+  static const Color scaffoldBg = Color(0xFFFAF8F5); // Light warm background
+  static const Color textPrimary = Color(0xFF1A1A1A); // Near black
+  static const Color textSecondary = Color(0xFF6B6560); // Warm gray
+  static const Color textTertiary = Color(0xFF9E9892); // Lighter warm gray
+  static const Color dividerColor = Color(0xFFE8E2D9); // Warm divider
+  static const Color errorColor = Color(0xFFDC2626);
+  static const Color successColor = Color(0xFF16A34A);
   static const Color warningColor = Color(0xFFF59E0B);
+  static const Color infoColor = Color(0xFF2563EB);
 
   // Status Colors
-  static const Color statusDraft = Color(0xFF94A3B8);
-  static const Color statusInProgress = Color(0xFF2563EB);
+  static const Color statusDraft = Color(0xFF9E9892);
+  static const Color statusInProgress = Color(0xFFE8490E); // DUOZZ Orange
   static const Color statusReview = Color(0xFFF59E0B);
-  static const Color statusDelivered = Color(0xFF7C3AED);
-  static const Color statusCompleted = Color(0xFF22C55E);
-  static const Color statusArchived = Color(0xFF94A3B8);
+  static const Color statusDelivered = Color(0xFF6B6560);
+  static const Color statusCompleted = Color(0xFF16A34A);
+  static const Color statusArchived = Color(0xFF9E9892);
   static const Color statusPending = Color(0xFFF59E0B);
-  static const Color statusApproved = Color(0xFF22C55E);
-  static const Color statusRejected = Color(0xFFEF4444);
+  static const Color statusApproved = Color(0xFF16A34A);
+  static const Color statusRejected = Color(0xFFDC2626);
 
   // Priority Colors
-  static const Color priorityLow = Color(0xFF22C55E);
-  static const Color priorityMedium = Color(0xFF3B82F6);
-  static const Color priorityHigh = Color(0xFFF59E0B);
-  static const Color priorityUrgent = Color(0xFFEF4444);
+  static const Color priorityLow = Color(0xFF16A34A);
+  static const Color priorityMedium = Color(0xFFF59E0B);
+  static const Color priorityHigh = Color(0xFFE8490E);
+  static const Color priorityUrgent = Color(0xFFDC2626);
 
-  // Gradient
+  // Gradient - DUOZZ style (orange to dark)
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [primaryColor, secondaryColor],
+    colors: [Color(0xFFE8490E), Color(0xFFC43A08)],
   );
 
   static const LinearGradient splashGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+    colors: [Color(0xFF1A1A1A), Color(0xFF2D2926)],
   );
 
+  // Light Theme ONLY (no dark mode)
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       fontFamily: 'Poppins',
+      brightness: Brightness.light,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         primary: primaryColor,
         secondary: secondaryColor,
-        surface: surfaceColor,
+        surface: scaffoldBg,
         error: errorColor,
+        brightness: Brightness.light,
       ),
-      scaffoldBackgroundColor: surfaceColor,
+      scaffoldBackgroundColor: scaffoldBg,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,
         foregroundColor: textPrimary,
@@ -360,15 +366,15 @@ class AppTheme {
   static Color getRoleColor(String role) {
     switch (role) {
       case 'admin':
-        return const Color(0xFFEF4444);
+        return const Color(0xFFE8490E); // DUOZZ Orange for admin
       case 'manager':
-        return const Color(0xFF2563EB);
+        return const Color(0xFF6B6560); // Warm gray
       case 'editor':
-        return const Color(0xFF7C3AED);
+        return const Color(0xFF2563EB); // Blue
       case 'freelancer':
-        return const Color(0xFFF59E0B);
+        return const Color(0xFFF59E0B); // Amber
       case 'client':
-        return const Color(0xFF22C55E);
+        return const Color(0xFF16A34A); // Green
       default:
         return textSecondary;
     }

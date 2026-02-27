@@ -68,7 +68,7 @@ class _SplashScreenState extends State<SplashScreen>
           gradient: AppTheme.splashGradient,
         ),
         child: AnimatedBuilder(
-          animation: _controller,
+          listenable: _controller,
           builder: (context, child) {
             return Opacity(
               opacity: _fadeAnimation.value,

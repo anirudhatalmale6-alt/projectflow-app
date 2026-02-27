@@ -1,24 +1,99 @@
-const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { s3Client, BUCKET_NAME } = require('../config/s3');
+const { getGoogleDriveClient, FOLDER_ID } = require('../config/googleDrive');
+const { Readable } = require('stream');
 const fs = require('fs');
 const path = require('path');
 
 class FileService {
-  // Upload file to S3 (from buffer)
-  static async uploadToS3(fileBuffer, key, contentType) {
-    const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-      Body: fileBuffer,
-      ContentType: contentType,
-      ServerSideEncryption: 'AES256',
+  // Upload file to Google Drive
+  static async uploadToGoogleDrive(fileBuffer, fileName, mimeType, projectId) {
+    const drive = getGoogleDriveClient();
+
+    // Create project subfolder if needed
+    let folderId = FOLDER_ID;
+    if (projectId) {
+      folderId = await FileService._getOrCreateFolder(drive, projectId, FOLDER_ID);
+    }
+
+    const stream = new Readable();
+    stream.push(fileBuffer);
+    stream.push(null);
+
+    const response = await drive.files.create({
+      requestBody: {
+        name: fileName,
+        parents: [folderId],
+      },
+      media: {
+        mimeType: mimeType,
+        body: stream,
+      },
+      fields: 'id, name, webViewLink, webContentLink, size',
     });
-    await s3Client.send(command);
-    return key;
+
+    return {
+      fileId: response.data.id,
+      fileName: response.data.name,
+      webViewLink: response.data.webViewLink,
+      size: response.data.size,
+    };
   }
 
-  // Upload file to local storage (fallback when S3 not configured)
+  // Get or create a project subfolder in Google Drive
+  static async _getOrCreateFolder(drive, folderName, parentId) {
+    // Search for existing folder
+    const search = await drive.files.list({
+      q: `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id, name)',
+    });
+
+    if (search.data.files.length > 0) {
+      return search.data.files[0].id;
+    }
+
+    // Create new folder
+    const folder = await drive.files.create({
+      requestBody: {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [parentId],
+      },
+      fields: 'id',
+    });
+
+    return folder.data.id;
+  }
+
+  // Generate a shareable download link
+  static async getDownloadLink(fileId) {
+    const drive = getGoogleDriveClient();
+
+    // Set file to "anyone with link can view"
+    await drive.permissions.create({
+      fileId: fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+
+    const file = await drive.files.get({
+      fileId: fileId,
+      fields: 'webContentLink, webViewLink',
+    });
+
+    return {
+      downloadUrl: file.data.webContentLink,
+      viewUrl: file.data.webViewLink,
+    };
+  }
+
+  // Delete file from Google Drive
+  static async deleteFromGoogleDrive(fileId) {
+    const drive = getGoogleDriveClient();
+    await drive.files.delete({ fileId });
+  }
+
+  // Upload to local storage (fallback)
   static async uploadToLocal(fileBuffer, key) {
     const uploadDir = process.env.UPLOAD_DIR || './uploads';
     const filePath = path.join(uploadDir, key);
@@ -26,33 +101,13 @@ class FileService {
 
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(filePath, fileBuffer);
-    return key;
+    return { fileId: key, fileName: path.basename(key), size: fileBuffer.length };
   }
 
-  // Get presigned download URL from S3
-  static async getPresignedUrl(key, expiresIn = 3600) {
-    const command = new GetObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-    });
-    return getSignedUrl(s3Client, command, { expiresIn });
-  }
-
-  // Get local file URL
   static getLocalUrl(key) {
     return `/uploads/${key}`;
   }
 
-  // Delete file from S3
-  static async deleteFromS3(key) {
-    const command = new DeleteObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-    });
-    await s3Client.send(command);
-  }
-
-  // Delete local file
   static deleteLocal(key) {
     const uploadDir = process.env.UPLOAD_DIR || './uploads';
     const filePath = path.join(uploadDir, key);
@@ -61,28 +116,30 @@ class FileService {
     }
   }
 
-  // Smart upload - uses S3 if configured, local otherwise
-  static async upload(fileBuffer, key, contentType) {
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-      return this.uploadToS3(fileBuffer, key, contentType);
+  // Smart upload - uses Google Drive if configured, local otherwise
+  static async upload(fileBuffer, fileName, mimeType, projectId) {
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+      return FileService.uploadToGoogleDrive(fileBuffer, fileName, mimeType, projectId);
     }
-    return this.uploadToLocal(fileBuffer, key);
+    const key = `projects/${projectId || 'unknown'}/deliveries/${Date.now()}-${fileName}`;
+    return FileService.uploadToLocal(fileBuffer, key);
   }
 
-  // Smart get URL - presigned for S3, local path otherwise
-  static async getDownloadUrl(key) {
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-      return this.getPresignedUrl(key);
+  // Smart get URL
+  static async getDownloadUrl(fileId) {
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+      const links = await FileService.getDownloadLink(fileId);
+      return links.downloadUrl;
     }
-    return this.getLocalUrl(key);
+    return FileService.getLocalUrl(fileId);
   }
 
   // Smart delete
-  static async delete(key) {
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-      return this.deleteFromS3(key);
+  static async delete(fileId) {
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+      return FileService.deleteFromGoogleDrive(fileId);
     }
-    return this.deleteLocal(key);
+    return FileService.deleteLocal(fileId);
   }
 }
 

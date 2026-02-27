@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 const { requireProjectAccess, requireProjectRole } = require('../middleware/rbac');
 const { logAudit, getClientIp } = require('../utils/audit');
 const pool = require('../config/database');
-const { upload, generateFileKey } = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 const FileService = require('../services/fileService');
 
 const router = express.Router();
@@ -48,10 +48,9 @@ router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'ed
 
     // Handle file upload if a file was provided
     if (req.file) {
-      const fileKey = generateFileKey(projectId, req.file.originalname);
-      await FileService.upload(req.file.buffer, fileKey, req.file.mimetype);
-      fileUrl = fileKey;
-      fileSize = req.file.size;
+      const result = await FileService.upload(req.file.buffer, req.file.originalname, req.file.mimetype, projectId);
+      fileUrl = result.fileId;
+      fileSize = result.size || req.file.size;
     }
 
     const delivery = await DeliveryJob.create({

@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Entre na sua conta VideoFlow',
+                'Entre na sua conta Duozz Flow',
                 style: TextStyle(
                   fontSize: 16,
                   color: AppTheme.textSecondary,

@@ -30,11 +30,11 @@ import 'screens/admin/admin_users_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const VideoFlowApp());
+  runApp(const DuozzFlowApp());
 }
 
-class VideoFlowApp extends StatelessWidget {
-  const VideoFlowApp({super.key});
+class DuozzFlowApp extends StatelessWidget {
+  const DuozzFlowApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +47,7 @@ class VideoFlowApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: MaterialApp(
-        title: 'VideoFlow',
+        title: 'Duozz Flow',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         initialRoute: '/',

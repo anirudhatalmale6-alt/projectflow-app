@@ -196,7 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildSettingTile(
                     icon: Icons.info_outlined,
                     title: 'Sobre',
-                    subtitle: 'VideoFlow v1.0.0',
+                    subtitle: 'Duozz Flow v1.0.0',
                     onTap: () {},
                   ),
                   const SizedBox(height: 24),

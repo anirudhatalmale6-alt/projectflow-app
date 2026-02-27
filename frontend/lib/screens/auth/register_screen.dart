@@ -67,7 +67,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Preencha os dados para criar sua conta VideoFlow',
+                'Preencha os dados para criar sua conta Duozz Flow',
                 style: TextStyle(
                   fontSize: 16,
                   color: AppTheme.textSecondary,

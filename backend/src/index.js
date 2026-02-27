@@ -97,7 +97,7 @@ if (process.env.NODE_ENV !== 'production') {
 app.get('/api/v1/health', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'video-editing-platform-api',
+    service: 'duozz-flow-api',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
@@ -155,7 +155,7 @@ app.use(errorHandler);
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 server.listen(PORT, () => {
-  console.log(`Video Editing Platform API running on port ${PORT}`);
+  console.log(`Duozz Flow API running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`CORS origin: ${corsOptions.origin}`);
 });

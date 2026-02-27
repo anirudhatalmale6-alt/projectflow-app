@@ -92,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      'VideoFlow',
+                      'Duozz Flow',
                       style: TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.w700,
@@ -103,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Gestao de equipes de video',
+                      'Gestão de equipes de edição',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.white.withOpacity(0.8),

@@ -1,7 +1,7 @@
 {
-  "name": "video-editing-platform-backend",
+  "name": "duozz-flow-backend",
   "version": "2.0.0",
-  "description": "Video editing team management platform - SaaS multi-tenant REST API",
+  "description": "Duozz Flow Platform - SaaS multi-tenant REST API",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -9,14 +9,13 @@
     "migrate": "node src/migrations/run.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.999.0",
-    "@aws-sdk/s3-request-presigner": "^3.999.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.2.1",
     "express-validator": "^7.3.1",
+    "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.2",

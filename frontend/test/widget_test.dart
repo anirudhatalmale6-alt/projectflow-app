@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:project_manager/main.dart';
+import 'package:duozzflow/main.dart';
 
 void main() {
   testWidgets('App builds without errors', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProjectManagerApp());
+    await tester.pumpWidget(const DuozzFlowApp());
     // Verify splash screen renders
-    expect(find.text('ProjectFlow'), findsOneWidget);
+    expect(find.text('Duozz Flow'), findsOneWidget);
   });
 }

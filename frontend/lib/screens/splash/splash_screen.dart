@@ -92,35 +92,44 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                     const SizedBox(height: 32),
-                    // DUOZZ in orange
-                    const Text(
-                      'DUOZZ',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.primaryColor,
-                        fontFamily: 'Poppins',
-                        letterSpacing: 4,
+                    // Duozz Flow title
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Duozz ',
+                            style: TextStyle(
+                              fontSize: 44,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.primaryColor,
+                              fontFamily: 'Poppins',
+                              letterSpacing: 2,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'Flow',
+                            style: TextStyle(
+                              fontSize: 44,
+                              fontWeight: FontWeight.w300,
+                              color: Colors.white,
+                              fontFamily: 'Poppins',
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const Text(
-                      'FLOW',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w300,
-                        color: Colors.white,
-                        fontFamily: 'Poppins',
-                        letterSpacing: 8,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Text(
-                      'Gestão de equipes de edição',
+                      'É pra ontem!',
                       style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 16,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.white.withOpacity(0.7),
                         fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w400,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1,
                       ),
                     ),
                     const SizedBox(height: 48),

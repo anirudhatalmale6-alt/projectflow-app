@@ -34,10 +34,7 @@ const Notification = {
   },
 
   async findByUserId(userId, { limit = 50, offset = 0, unreadOnly = false } = {}) {
-    let query = `
-      SELECT * FROM notifications
-      WHERE user_id = $1
-    `;
+    let query = `SELECT * FROM notifications WHERE user_id = $1`;
     const values = [userId];
     let paramIndex = 2;
 

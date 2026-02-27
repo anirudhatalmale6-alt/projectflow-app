@@ -3,60 +3,74 @@ const Project = require('../models/Project');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { requireProjectAccess, requireProjectManager, requireGlobalRole } = require('../middleware/rbac');
+const { logAudit, getClientIp } = require('../utils/audit');
 const pool = require('../config/database');
 
 const router = express.Router();
 
-// GET /api/projects - list user's projects
-router.get('/', auth, async (req, res, next) => {
+// All routes require auth
+router.use(auth);
+
+// GET /api/v1/projects - list projects (filtered by role)
+router.get('/', async (req, res, next) => {
   try {
-    const projects = await Project.findByUserId(req.user.id);
+    const { status, client_id, limit = 50, offset = 0 } = req.query;
 
-    // Attach member count to each project
-    const projectsWithCounts = await Promise.all(
-      projects.map(async (project) => {
-        const { rows } = await pool.query(
-          'SELECT COUNT(*)::int AS member_count FROM project_members WHERE project_id = $1',
-          [project.id]
-        );
-        const { rows: taskRows } = await pool.query(
-          `SELECT COUNT(*)::int AS task_count,
-                  COUNT(*) FILTER (WHERE status = 'done')::int AS done_count
-           FROM tasks WHERE project_id = $1`,
-          [project.id]
-        );
-        return {
-          ...project,
-          member_count: rows[0].member_count,
-          task_count: taskRows[0].task_count,
-          done_count: taskRows[0].done_count,
-        };
-      })
-    );
+    const projects = await Project.findAll({
+      limit: Math.min(parseInt(limit, 10) || 50, 200),
+      offset: parseInt(offset, 10) || 0,
+      status: status || undefined,
+      clientId: client_id || undefined,
+      userId: req.user.id,
+      userRole: req.user.role,
+    });
 
-    res.json({ projects: projectsWithCounts });
+    res.json({ projects });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/projects - create project
-router.post('/', auth, async (req, res, next) => {
+// POST /api/v1/projects - create project
+// Only admin and manager can create projects
+router.post('/', requireGlobalRole('admin', 'manager'), async (req, res, next) => {
   try {
-    const { name, description, color } = req.body;
+    const { name, description, client_id, status, deadline, budget, currency } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return res.status(400).json({ error: 'Project name is required.' });
     }
 
+    const validStatuses = ['draft', 'in_progress', 'review', 'delivered', 'completed', 'archived'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` });
+    }
+
+    if (currency && !['BRL', 'USD', 'EUR'].includes(currency)) {
+      return res.status(400).json({ error: 'Invalid currency. Must be BRL, USD, or EUR.' });
+    }
+
     const project = await Project.create({
       name: name.trim(),
       description: description || null,
-      ownerId: req.user.id,
-      color: color || '#6366f1',
+      clientId: client_id || null,
+      status: status || 'draft',
+      deadline: deadline || null,
+      budget: budget || null,
+      currency: currency || 'BRL',
+      createdBy: req.user.id,
     });
 
-    // Emit socket event
+    await logAudit({
+      userId: req.user.id,
+      action: 'create',
+      entityType: 'project',
+      entityId: project.id,
+      details: { name: project.name, status: project.status },
+      ipAddress: getClientIp(req),
+    });
+
     const io = req.app.get('io');
     if (io) {
       io.to(`user:${req.user.id}`).emit('project_created', project);
@@ -68,67 +82,68 @@ router.post('/', auth, async (req, res, next) => {
   }
 });
 
-// GET /api/projects/:id - get project details
-router.get('/:id', auth, async (req, res, next) => {
+// GET /api/v1/projects/:id - project details with members, task stats, deliveries count
+router.get('/:id', requireProjectAccess(), async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
-    // Check membership
-    const membership = await Project.isMember(project.id, req.user.id);
-    if (!membership && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied. You are not a member of this project.' });
-    }
-
-    // Get members
     const members = await Project.getMembers(project.id);
+    const stats = await Project.getStats(project.id);
 
-    res.json({ project, members, user_role: membership ? membership.role : 'admin' });
+    res.json({
+      project,
+      members,
+      stats,
+      user_project_role: req.projectRole,
+    });
   } catch (err) {
     next(err);
   }
 });
 
-// PUT /api/projects/:id - update project
-router.put('/:id', auth, async (req, res, next) => {
+// PUT /api/v1/projects/:id - update project
+// Only admin, global manager, or project manager
+router.put('/:id', requireProjectManager(), async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
-    // Check permission (owner or project admin)
-    const membership = await Project.isMember(project.id, req.user.id);
-    if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Access denied. Only project owners and admins can update projects.' });
-      }
+    const { name, description, client_id, status, deadline, budget, currency } = req.body;
+
+    const validStatuses = ['draft', 'in_progress', 'review', 'delivered', 'completed', 'archived'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` });
     }
 
-    const { name, description, status, color } = req.body;
+    if (currency && !['BRL', 'USD', 'EUR'].includes(currency)) {
+      return res.status(400).json({ error: 'Invalid currency. Must be BRL, USD, or EUR.' });
+    }
+
     const updates = {};
     if (name !== undefined) updates.name = name.trim();
     if (description !== undefined) updates.description = description;
-    if (status !== undefined) {
-      if (!['active', 'archived', 'completed'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status. Must be active, archived, or completed.' });
-      }
-      updates.status = status;
-    }
-    if (color !== undefined) updates.color = color;
+    if (client_id !== undefined) updates.client_id = client_id || null;
+    if (status !== undefined) updates.status = status;
+    if (deadline !== undefined) updates.deadline = deadline || null;
+    if (budget !== undefined) updates.budget = budget;
+    if (currency !== undefined) updates.currency = currency;
 
     const updated = await Project.update(req.params.id, updates);
 
-    // Log activity
-    await pool.query(
-      `INSERT INTO activity_log (project_id, user_id, action, entity_type, entity_id, details)
-       VALUES ($1, $2, 'updated', 'project', $3, $4)`,
-      [project.id, req.user.id, project.id, JSON.stringify(updates)]
-    );
+    await logAudit({
+      userId: req.user.id,
+      action: 'update',
+      entityType: 'project',
+      entityId: project.id,
+      details: updates,
+      ipAddress: getClientIp(req),
+    });
 
-    // Emit socket event to project room
     const io = req.app.get('io');
     if (io) {
       io.to(`project:${project.id}`).emit('project_updated', updated);
@@ -140,28 +155,25 @@ router.put('/:id', auth, async (req, res, next) => {
   }
 });
 
-// DELETE /api/projects/:id - archive project
-router.delete('/:id', auth, async (req, res, next) => {
+// DELETE /api/v1/projects/:id - archive project
+// Only admin or project manager
+router.delete('/:id', requireProjectManager(), async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
-    // Only owner or system admin can archive
-    const membership = await Project.isMember(project.id, req.user.id);
-    if ((!membership || membership.role !== 'owner') && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied. Only project owners can archive projects.' });
-    }
+    const archived = await Project.delete(req.params.id);
 
-    const archived = await Project.archive(req.params.id);
-
-    // Log activity
-    await pool.query(
-      `INSERT INTO activity_log (project_id, user_id, action, entity_type, entity_id, details)
-       VALUES ($1, $2, 'archived', 'project', $3, $4)`,
-      [project.id, req.user.id, project.id, JSON.stringify({ name: project.name })]
-    );
+    await logAudit({
+      userId: req.user.id,
+      action: 'archive',
+      entityType: 'project',
+      entityId: project.id,
+      details: { name: project.name },
+      ipAddress: getClientIp(req),
+    });
 
     res.json({ message: 'Project archived successfully.', project: archived });
   } catch (err) {
@@ -169,29 +181,23 @@ router.delete('/:id', auth, async (req, res, next) => {
   }
 });
 
-// POST /api/projects/:id/members - add member
-router.post('/:id/members', auth, async (req, res, next) => {
+// POST /api/v1/projects/:id/members - add member
+// Only admin, global manager, or project manager
+router.post('/:id/members', requireProjectManager(), async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
-    // Check permission
-    const membership = await Project.isMember(project.id, req.user.id);
-    if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Access denied. Only project owners and admins can add members.' });
-      }
+    const { userId, email, role = 'editor' } = req.body;
+
+    const validProjectRoles = ['manager', 'editor', 'freelancer'];
+    if (!validProjectRoles.includes(role)) {
+      return res.status(400).json({ error: `Invalid project role. Must be one of: ${validProjectRoles.join(', ')}.` });
     }
 
-    const { userId, email, role = 'member' } = req.body;
-
-    if (!['owner', 'admin', 'member', 'viewer'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role. Must be owner, admin, member, or viewer.' });
-    }
-
-    // Find user by id or email
+    // Find target user by id or email
     let targetUser;
     if (userId) {
       targetUser = await User.findById(userId);
@@ -205,10 +211,9 @@ router.post('/:id/members', auth, async (req, res, next) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    // Add member
     await Project.addMember(project.id, targetUser.id, role);
 
-    // Create notification for the invited user
+    // Notify the invited user
     await Notification.create({
       userId: targetUser.id,
       type: 'project_invite',
@@ -218,14 +223,15 @@ router.post('/:id/members', auth, async (req, res, next) => {
       referenceType: 'project',
     });
 
-    // Log activity
-    await pool.query(
-      `INSERT INTO activity_log (project_id, user_id, action, entity_type, entity_id, details)
-       VALUES ($1, $2, 'member_added', 'project', $3, $4)`,
-      [project.id, req.user.id, project.id, JSON.stringify({ member_name: targetUser.name, role })]
-    );
+    await logAudit({
+      userId: req.user.id,
+      action: 'add_member',
+      entityType: 'project',
+      entityId: project.id,
+      details: { member_id: targetUser.id, member_name: targetUser.name, role },
+      ipAddress: getClientIp(req),
+    });
 
-    // Emit socket events
     const io = req.app.get('io');
     if (io) {
       io.to(`project:${project.id}`).emit('member_joined', {
@@ -247,30 +253,17 @@ router.post('/:id/members', auth, async (req, res, next) => {
   }
 });
 
-// DELETE /api/projects/:id/members/:userId - remove member
-router.delete('/:id/members/:userId', auth, async (req, res, next) => {
+// DELETE /api/v1/projects/:id/members/:userId - remove member
+router.delete('/:id/members/:userId', requireProjectManager(), async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
-    // Check permission (owner, project admin, or the member themselves)
-    const membership = await Project.isMember(project.id, req.user.id);
-    const isSelf = req.params.userId === req.user.id;
-
-    if (!isSelf) {
-      if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
-        if (req.user.role !== 'admin') {
-          return res.status(403).json({ error: 'Access denied. Only project owners and admins can remove members.' });
-        }
-      }
-    }
-
-    // Cannot remove the owner
-    const targetMembership = await Project.isMember(project.id, req.params.userId);
-    if (targetMembership && targetMembership.role === 'owner') {
-      return res.status(400).json({ error: 'Cannot remove the project owner.' });
+    // Cannot remove the project creator
+    if (req.params.userId === project.created_by) {
+      return res.status(400).json({ error: 'Cannot remove the project creator.' });
     }
 
     const removed = await Project.removeMember(req.params.id, req.params.userId);
@@ -278,48 +271,17 @@ router.delete('/:id/members/:userId', auth, async (req, res, next) => {
       return res.status(404).json({ error: 'Member not found in project.' });
     }
 
-    // Log activity
-    await pool.query(
-      `INSERT INTO activity_log (project_id, user_id, action, entity_type, entity_id, details)
-       VALUES ($1, $2, 'member_removed', 'project', $3, $4)`,
-      [project.id, req.user.id, project.id, JSON.stringify({ removed_user_id: req.params.userId })]
-    );
+    await logAudit({
+      userId: req.user.id,
+      action: 'remove_member',
+      entityType: 'project',
+      entityId: project.id,
+      details: { removed_user_id: req.params.userId },
+      ipAddress: getClientIp(req),
+    });
 
     const members = await Project.getMembers(project.id);
     res.json({ message: 'Member removed successfully.', members });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /api/projects/:id/stats - project stats
-router.get('/:id/stats', auth, async (req, res, next) => {
-  try {
-    const project = await Project.findById(req.params.id);
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found.' });
-    }
-
-    // Check membership
-    const membership = await Project.isMember(project.id, req.user.id);
-    if (!membership && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied.' });
-    }
-
-    const stats = await Project.getStats(req.params.id);
-
-    // Recent activity
-    const { rows: recentActivity } = await pool.query(
-      `SELECT al.*, u.name AS user_name, u.avatar_url AS user_avatar
-       FROM activity_log al
-       JOIN users u ON al.user_id = u.id
-       WHERE al.project_id = $1
-       ORDER BY al.created_at DESC
-       LIMIT 20`,
-      [req.params.id]
-    );
-
-    res.json({ stats, recent_activity: recentActivity });
   } catch (err) {
     next(err);
   }

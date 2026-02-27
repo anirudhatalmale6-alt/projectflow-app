@@ -12,19 +12,19 @@ class LoadingWidget extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-            ),
+          const CircularProgressIndicator(
+            color: AppTheme.primaryColor,
+            strokeWidth: 3,
           ),
           if (message != null) ...[
             const SizedBox(height: 16),
             Text(
               message!,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 14,
+                fontFamily: 'Poppins',
+              ),
             ),
           ],
         ],
@@ -54,31 +54,6 @@ class LoadingOverlay extends StatelessWidget {
             child: const LoadingWidget(),
           ),
       ],
-    );
-  }
-}
-
-class ShimmerLoading extends StatelessWidget {
-  final double width;
-  final double height;
-  final double borderRadius;
-
-  const ShimmerLoading({
-    super.key,
-    this.width = double.infinity,
-    required this.height,
-    this.borderRadius = 8,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(borderRadius),
-      ),
     );
   }
 }

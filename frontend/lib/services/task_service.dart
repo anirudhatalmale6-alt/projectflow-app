@@ -5,70 +5,60 @@ import 'api_service.dart';
 class TaskService {
   final ApiService _api = ApiService();
 
-  Future<List<Task>> getTasks(String projectId, {String? status, String? assignee}) async {
-    String url = ApiConfig.tasks(projectId);
-    final queryParams = <String, String>{};
-    if (status != null) queryParams['status'] = status;
-    if (assignee != null) queryParams['assignee'] = assignee;
-    if (queryParams.isNotEmpty) {
-      url += '?${queryParams.entries.map((e) => '${e.key}=${e.value}').join('&')}';
-    }
-    final response = await _api.get(url);
-    final List<dynamic> data = response['tasks'] ?? response['data'] ?? response;
-    return data.map((json) => Task.fromJson(json)).toList();
+  Future<List<Task>> getTasks({
+    String? projectId,
+    String? status,
+    String? assigneeId,
+    String? search,
+  }) async {
+    final params = <String, String>{};
+    if (status != null) params['status'] = status;
+    if (assigneeId != null) params['assignee_id'] = assigneeId;
+    if (search != null && search.isNotEmpty) params['search'] = search;
+
+    final path = projectId != null
+        ? ApiConfig.tasksByProject(projectId)
+        : ApiConfig.tasks;
+
+    final data = await _api.get(path, queryParams: params);
+    final list = data['tasks'] ?? data['data'] ?? data;
+    return (list as List).map((json) => Task.fromJson(json)).toList();
   }
 
-  Future<Task> getTask(String projectId, String taskId) async {
-    final response = await _api.get(ApiConfig.task(projectId, taskId));
-    final data = response['task'] ?? response['data'] ?? response;
-    return Task.fromJson(data);
+  Future<Task> getTask(String id) async {
+    final data = await _api.get(ApiConfig.taskById(id));
+    return Task.fromJson(data['task'] ?? data);
   }
 
-  Future<Task> createTask(String projectId, Map<String, dynamic> data) async {
-    final response = await _api.post(ApiConfig.tasks(projectId), body: data);
-    final taskData = response['task'] ?? response['data'] ?? response;
-    return Task.fromJson(taskData);
+  Future<Task> createTask(Map<String, dynamic> taskData) async {
+    final data = await _api.post(ApiConfig.tasks, body: taskData);
+    return Task.fromJson(data['task'] ?? data);
   }
 
-  Future<Task> updateTask(
-      String projectId, String taskId, Map<String, dynamic> data) async {
-    final response =
-        await _api.put(ApiConfig.task(projectId, taskId), body: data);
-    final taskData = response['task'] ?? response['data'] ?? response;
-    return Task.fromJson(taskData);
+  Future<Task> updateTask(String id, Map<String, dynamic> taskData) async {
+    final data = await _api.put(ApiConfig.taskById(id), body: taskData);
+    return Task.fromJson(data['task'] ?? data);
   }
 
-  Future<Task> updateTaskStatus(
-      String projectId, String taskId, String status) async {
-    final response = await _api.patch(
-      ApiConfig.taskStatus(projectId, taskId),
-      body: {'status': status},
+  Future<void> deleteTask(String id) async {
+    await _api.delete(ApiConfig.taskById(id));
+  }
+
+  Future<void> updateStatus(String id, String status) async {
+    await _api.patch(ApiConfig.taskStatus(id), body: {'status': status});
+  }
+
+  Future<void> updatePosition(String id, int position, {String? status}) async {
+    await _api.patch(
+      ApiConfig.taskPosition(id),
+      body: {'position': position, if (status != null) 'status': status},
     );
-    final taskData = response['task'] ?? response['data'] ?? response;
-    return Task.fromJson(taskData);
   }
 
-  Future<Task> assignTask(
-      String projectId, String taskId, String assigneeId) async {
-    final response = await _api.patch(
-      ApiConfig.taskAssign(projectId, taskId),
-      body: {'assignee': assigneeId},
+  Future<void> updateHours(String id, double actualHours) async {
+    await _api.patch(
+      ApiConfig.taskHours(id),
+      body: {'actual_hours': actualHours},
     );
-    final taskData = response['task'] ?? response['data'] ?? response;
-    return Task.fromJson(taskData);
-  }
-
-  Future<void> deleteTask(String projectId, String taskId) async {
-    await _api.delete(ApiConfig.task(projectId, taskId));
-  }
-
-  Future<List<Task>> getMyTasks({String? status}) async {
-    String url = ApiConfig.myTasks;
-    if (status != null) {
-      url += '?status=$status';
-    }
-    final response = await _api.get(url);
-    final List<dynamic> data = response['tasks'] ?? response['data'] ?? response;
-    return data.map((json) => Task.fromJson(json)).toList();
   }
 }

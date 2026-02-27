@@ -1,53 +1,42 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/project.dart';
+import '../models/user.dart';
+import '../models/client_model.dart';
 import '../services/project_service.dart';
-import '../services/socket_service.dart';
+import '../services/client_service.dart';
+import '../services/api_service.dart';
 
-class ProjectProvider extends ChangeNotifier {
+class ProjectProvider with ChangeNotifier {
   final ProjectService _projectService = ProjectService();
-  final SocketService _socketService = SocketService();
+  final ClientService _clientService = ClientService();
 
   List<Project> _projects = [];
-  Project? _selectedProject;
+  List<ClientModel> _clients = [];
+  Project? _currentProject;
+  List<User> _currentMembers = [];
   bool _isLoading = false;
   String? _errorMessage;
 
   List<Project> get projects => _projects;
-  Project? get selectedProject => _selectedProject;
+  List<ClientModel> get clients => _clients;
+  Project? get currentProject => _currentProject;
+  List<User> get currentMembers => _currentMembers;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  ProjectProvider() {
-    _setupSocketListeners();
-  }
-
-  void _setupSocketListeners() {
-    _socketService.on('project:updated', (data) {
-      if (data is Map<String, dynamic>) {
-        final updated = Project.fromJson(data);
-        final index = _projects.indexWhere((p) => p.id == updated.id);
-        if (index != -1) {
-          _projects[index] = updated;
-          if (_selectedProject?.id == updated.id) {
-            _selectedProject = updated;
-          }
-          notifyListeners();
-        }
-      }
-    });
-  }
-
-  Future<void> loadProjects() async {
+  Future<void> loadProjects({String? status, String? search}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _projects = await _projectService.getProjects();
+      _projects = await _projectService.getProjects(
+        status: status,
+        search: search,
+      );
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
     }
-
     _isLoading = false;
     notifyListeners();
   }
@@ -58,12 +47,11 @@ class ProjectProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _selectedProject = await _projectService.getProject(id);
-      _socketService.joinProject(id);
+      _currentProject = await _projectService.getProject(id);
+      _currentMembers = await _projectService.getMembers(id);
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
     }
-
     _isLoading = false;
     notifyListeners();
   }
@@ -80,7 +68,7 @@ class ProjectProvider extends ChangeNotifier {
       notifyListeners();
       return project;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return null;
@@ -91,16 +79,12 @@ class ProjectProvider extends ChangeNotifier {
     try {
       final updated = await _projectService.updateProject(id, data);
       final index = _projects.indexWhere((p) => p.id == id);
-      if (index != -1) {
-        _projects[index] = updated;
-      }
-      if (_selectedProject?.id == id) {
-        _selectedProject = updated;
-      }
+      if (index >= 0) _projects[index] = updated;
+      if (_currentProject?.id == id) _currentProject = updated;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
       notifyListeners();
       return false;
     }
@@ -110,45 +94,86 @@ class ProjectProvider extends ChangeNotifier {
     try {
       await _projectService.deleteProject(id);
       _projects.removeWhere((p) => p.id == id);
-      if (_selectedProject?.id == id) {
-        _selectedProject = null;
-        _socketService.leaveProject(id);
-      }
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
       notifyListeners();
       return false;
     }
   }
 
-  Future<void> addMember(String projectId, String email, {String role = 'member'}) async {
+  Future<void> addMember(String projectId, String userId) async {
     try {
-      await _projectService.addMember(projectId, email, role: role);
-      await loadProject(projectId);
-    } catch (e) {
-      _errorMessage = e.toString();
+      await _projectService.addMember(projectId, userId);
+      _currentMembers = await _projectService.getMembers(projectId);
       notifyListeners();
-      rethrow;
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      notifyListeners();
     }
   }
 
   Future<void> removeMember(String projectId, String userId) async {
     try {
       await _projectService.removeMember(projectId, userId);
-      await loadProject(projectId);
-    } catch (e) {
-      _errorMessage = e.toString();
+      _currentMembers.removeWhere((m) => m.id == userId);
       notifyListeners();
-      rethrow;
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      notifyListeners();
     }
   }
 
-  void leaveProject(String id) {
-    _socketService.leaveProject(id);
-    _selectedProject = null;
-    notifyListeners();
+  // Clients
+  Future<void> loadClients({String? search}) async {
+    try {
+      _clients = await _clientService.getClients(search: search);
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      notifyListeners();
+    }
+  }
+
+  Future<ClientModel?> createClient(Map<String, dynamic> data) async {
+    try {
+      final client = await _clientService.createClient(data);
+      _clients.insert(0, client);
+      notifyListeners();
+      return client;
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> updateClient(String id, Map<String, dynamic> data) async {
+    try {
+      final updated = await _clientService.updateClient(id, data);
+      final index = _clients.indexWhere((c) => c.id == id);
+      if (index >= 0) _clients[index] = updated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteClient(String id) async {
+    try {
+      await _clientService.deleteClient(id);
+      _clients.removeWhere((c) => c.id == id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      notifyListeners();
+      return false;
+    }
   }
 
   void clearError() {
@@ -156,11 +181,8 @@ class ProjectProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  @override
-  void dispose() {
-    if (_selectedProject != null) {
-      _socketService.leaveProject(_selectedProject!.id);
-    }
-    super.dispose();
+  String _parseError(dynamic error) {
+    if (error is ApiException) return error.message;
+    return 'Ocorreu um erro. Tente novamente.';
   }
 }

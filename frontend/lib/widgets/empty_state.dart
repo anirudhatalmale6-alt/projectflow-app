@@ -41,14 +41,23 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               title,
-              style: AppTheme.headingSmall,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimary,
+                fontFamily: 'Poppins',
+              ),
               textAlign: TextAlign.center,
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 8),
               Text(
                 subtitle!,
-                style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textSecondary,
+                  fontFamily: 'Poppins',
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -56,74 +65,8 @@ class EmptyState extends StatelessWidget {
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: onAction,
-                icon: const Icon(Icons.add, size: 20),
+                icon: const Icon(Icons.add),
                 label: Text(actionLabel!),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(200, 48),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class ErrorState extends StatelessWidget {
-  final String message;
-  final VoidCallback? onRetry;
-
-  const ErrorState({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppTheme.errorColor.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.error_outline_rounded,
-                size: 40,
-                color: AppTheme.errorColor.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Something went wrong',
-              style: AppTheme.headingSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.textSecondary),
-              textAlign: TextAlign.center,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded, size: 20),
-                label: const Text('Retry'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(160, 48),
-                ),
               ),
             ],
           ],

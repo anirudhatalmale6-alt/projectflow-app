@@ -6,61 +6,57 @@ import 'api_service.dart';
 class ProjectService {
   final ApiService _api = ApiService();
 
-  Future<List<Project>> getProjects() async {
-    final response = await _api.get(ApiConfig.projects);
-    final List<dynamic> data = response['projects'] ?? response['data'] ?? response;
-    return data.map((json) => Project.fromJson(json)).toList();
+  Future<List<Project>> getProjects({
+    String? status,
+    String? search,
+    int? page,
+    int? limit,
+  }) async {
+    final params = <String, String>{};
+    if (status != null) params['status'] = status;
+    if (search != null && search.isNotEmpty) params['search'] = search;
+    if (page != null) params['page'] = page.toString();
+    if (limit != null) params['limit'] = limit.toString();
+
+    final data = await _api.get(ApiConfig.projects, queryParams: params);
+    final list = data['projects'] ?? data['data'] ?? data;
+    return (list as List).map((json) => Project.fromJson(json)).toList();
   }
 
   Future<Project> getProject(String id) async {
-    final response = await _api.get(ApiConfig.project(id));
-    final data = response['project'] ?? response['data'] ?? response;
-    return Project.fromJson(data);
+    final data = await _api.get(ApiConfig.projectById(id));
+    return Project.fromJson(data['project'] ?? data);
   }
 
-  Future<Project> createProject(Map<String, dynamic> data) async {
-    final response = await _api.post(ApiConfig.projects, body: data);
-    final projectData = response['project'] ?? response['data'] ?? response;
-    return Project.fromJson(projectData);
+  Future<Project> createProject(Map<String, dynamic> projectData) async {
+    final data = await _api.post(ApiConfig.projects, body: projectData);
+    return Project.fromJson(data['project'] ?? data);
   }
 
-  Future<Project> updateProject(String id, Map<String, dynamic> data) async {
-    final response = await _api.put(ApiConfig.project(id), body: data);
-    final projectData = response['project'] ?? response['data'] ?? response;
-    return Project.fromJson(projectData);
+  Future<Project> updateProject(String id, Map<String, dynamic> projectData) async {
+    final data = await _api.put(ApiConfig.projectById(id), body: projectData);
+    return Project.fromJson(data['project'] ?? data);
   }
 
   Future<void> deleteProject(String id) async {
-    await _api.delete(ApiConfig.project(id));
+    await _api.delete(ApiConfig.projectById(id));
   }
 
-  Future<List<ProjectMember>> getMembers(String projectId) async {
-    final response = await _api.get(ApiConfig.projectMembers(projectId));
-    final List<dynamic> data = response['members'] ?? response['data'] ?? response;
-    return data.map((json) => ProjectMember.fromJson(json)).toList();
+  // Members
+  Future<List<User>> getMembers(String projectId) async {
+    final data = await _api.get(ApiConfig.projectMembers(projectId));
+    final list = data['members'] ?? data['data'] ?? data;
+    return (list as List).map((json) => User.fromJson(json)).toList();
   }
 
-  Future<void> addMember(String projectId, String email, {String role = 'member'}) async {
+  Future<void> addMember(String projectId, String userId, {String? role}) async {
     await _api.post(
       ApiConfig.projectMembers(projectId),
-      body: {'email': email, 'role': role},
+      body: {'user_id': userId, if (role != null) 'role': role},
     );
   }
 
   Future<void> removeMember(String projectId, String userId) async {
     await _api.delete(ApiConfig.projectMember(projectId, userId));
-  }
-
-  Future<void> updateMemberRole(
-      String projectId, String userId, String role) async {
-    await _api.put(
-      ApiConfig.projectMember(projectId, userId),
-      body: {'role': role},
-    );
-  }
-
-  Future<Map<String, dynamic>> getProjectStats(String id) async {
-    final response = await _api.get(ApiConfig.projectStats(id));
-    return response['stats'] ?? response['data'] ?? response;
   }
 }

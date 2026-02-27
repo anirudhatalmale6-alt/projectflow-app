@@ -4,8 +4,11 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/notifications - list user's notifications
-router.get('/', auth, async (req, res, next) => {
+// All routes require auth
+router.use(auth);
+
+// GET /api/v1/notifications - list user's notifications
+router.get('/', async (req, res, next) => {
   try {
     const { limit = 50, offset = 0, unread } = req.query;
 
@@ -23,8 +26,8 @@ router.get('/', auth, async (req, res, next) => {
   }
 });
 
-// PUT /api/notifications/:id/read - mark as read
-router.put('/:id/read', auth, async (req, res, next) => {
+// PUT /api/v1/notifications/:id/read - mark single notification as read
+router.put('/:id/read', async (req, res, next) => {
   try {
     const notification = await Notification.markAsRead(req.params.id, req.user.id);
     if (!notification) {
@@ -37,8 +40,8 @@ router.put('/:id/read', auth, async (req, res, next) => {
   }
 });
 
-// PUT /api/notifications/read-all - mark all as read
-router.put('/read-all', auth, async (req, res, next) => {
+// PUT /api/v1/notifications/read-all - mark all as read
+router.put('/read-all', async (req, res, next) => {
   try {
     const count = await Notification.markAllAsRead(req.user.id);
     res.json({ message: `Marked ${count} notifications as read.`, count });

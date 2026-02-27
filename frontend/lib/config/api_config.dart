@@ -1,51 +1,60 @@
 class ApiConfig {
-  // Base URL - change this to your server address
   static const String baseUrl = 'http://localhost:3000';
-  static const String apiVersion = '/api';
-  static const String apiBase = '$baseUrl$apiVersion';
+  static const String apiPrefix = '/api/v1';
+  static const String wsUrl = 'ws://localhost:3000';
 
-  // Socket.IO
-  static const String socketUrl = baseUrl;
+  // Auth
+  static const String login = '$apiPrefix/auth/login';
+  static const String register = '$apiPrefix/auth/register';
+  static const String refreshToken = '$apiPrefix/auth/refresh';
+  static const String logout = '$apiPrefix/auth/logout';
+  static const String me = '$apiPrefix/auth/me';
+  static const String updateProfile = '$apiPrefix/auth/profile';
 
-  // Auth endpoints
-  static const String login = '$apiBase/auth/login';
-  static const String register = '$apiBase/auth/register';
-  static const String profile = '$apiBase/auth/profile';
-  static const String updateProfile = '$apiBase/auth/profile';
+  // Clients
+  static const String clients = '$apiPrefix/clients';
+  static String clientById(String id) => '$apiPrefix/clients/$id';
 
-  // Project endpoints
-  static String projects = '$apiBase/projects';
-  static String project(String id) => '$apiBase/projects/$id';
-  static String projectMembers(String id) => '$apiBase/projects/$id/members';
+  // Projects
+  static const String projects = '$apiPrefix/projects';
+  static String projectById(String id) => '$apiPrefix/projects/$id';
+  static String projectMembers(String id) => '$apiPrefix/projects/$id/members';
   static String projectMember(String projectId, String userId) =>
-      '$apiBase/projects/$projectId/members/$userId';
-  static String projectStats(String id) => '$apiBase/projects/$id/stats';
+      '$apiPrefix/projects/$projectId/members/$userId';
 
-  // Task endpoints
-  static String tasks(String projectId) => '$apiBase/projects/$projectId/tasks';
-  static String task(String projectId, String taskId) =>
-      '$apiBase/projects/$projectId/tasks/$taskId';
-  static String taskStatus(String projectId, String taskId) =>
-      '$apiBase/projects/$projectId/tasks/$taskId/status';
-  static String taskAssign(String projectId, String taskId) =>
-      '$apiBase/projects/$projectId/tasks/$taskId/assign';
-  static String myTasks = '$apiBase/tasks/my-tasks';
+  // Tasks
+  static const String tasks = '$apiPrefix/tasks';
+  static String tasksByProject(String projectId) =>
+      '$apiPrefix/projects/$projectId/tasks';
+  static String taskById(String id) => '$apiPrefix/tasks/$id';
+  static String taskStatus(String id) => '$apiPrefix/tasks/$id/status';
+  static String taskPosition(String id) => '$apiPrefix/tasks/$id/position';
+  static String taskHours(String id) => '$apiPrefix/tasks/$id/hours';
 
-  // Comment endpoints
-  static String comments(String taskId) => '$apiBase/tasks/$taskId/comments';
-  static String comment(String taskId, String commentId) =>
-      '$apiBase/tasks/$taskId/comments/$commentId';
+  // Deliveries
+  static const String deliveries = '$apiPrefix/deliveries';
+  static String deliveriesByProject(String projectId) =>
+      '$apiPrefix/projects/$projectId/deliveries';
+  static String deliveryById(String id) => '$apiPrefix/deliveries/$id';
+  static String deliveryApprove(String id) => '$apiPrefix/deliveries/$id/approve';
+  static String deliveryReject(String id) => '$apiPrefix/deliveries/$id/reject';
+  static String deliveryRevision(String id) =>
+      '$apiPrefix/deliveries/$id/request-revision';
 
-  // Notification endpoints
-  static String notifications = '$apiBase/notifications';
-  static String notificationRead(String id) => '$apiBase/notifications/$id/read';
-  static String notificationsReadAll = '$apiBase/notifications/read-all';
+  // Comments
+  static String comments(String entityType, String entityId) =>
+      '$apiPrefix/$entityType/$entityId/comments';
+  static String commentById(String id) => '$apiPrefix/comments/$id';
 
-  // Admin endpoints
-  static String adminUsers = '$apiBase/admin/users';
-  static String adminUser(String id) => '$apiBase/admin/users/$id';
-  static String adminStats = '$apiBase/admin/stats';
+  // Notifications
+  static const String notifications = '$apiPrefix/notifications';
+  static String notificationRead(String id) =>
+      '$apiPrefix/notifications/$id/read';
+  static const String notificationsReadAll = '$apiPrefix/notifications/read-all';
 
-  // Request timeout
-  static const Duration timeout = Duration(seconds: 30);
+  // Admin
+  static const String adminUsers = '$apiPrefix/admin/users';
+  static String adminUserById(String id) => '$apiPrefix/admin/users/$id';
+  static const String adminStats = '$apiPrefix/admin/stats';
+  static const String adminAuditLog = '$apiPrefix/admin/audit-log';
 }

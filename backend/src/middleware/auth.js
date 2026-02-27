@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 
+/**
+ * JWT authentication middleware.
+ * Verifies the access token from the Authorization header and attaches
+ * the user object (id, name, email, avatar_url, role, phone) to req.user.
+ */
 const auth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -12,7 +17,7 @@ const auth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const { rows } = await pool.query(
-      'SELECT id, name, email, avatar_url, role, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, role, phone, created_at FROM users WHERE id = $1',
       [decoded.userId]
     );
 

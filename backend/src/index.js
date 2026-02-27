@@ -10,8 +10,11 @@ const setupSocket = require('./socket');
 
 // Route imports
 const authRoutes = require('./routes/auth');
+const clientRoutes = require('./routes/clients');
 const projectRoutes = require('./routes/projects');
 const taskRoutes = require('./routes/tasks');
+const deliveryRoutes = require('./routes/deliveries');
+const approvalRoutes = require('./routes/approvals');
 const commentRoutes = require('./routes/comments');
 const notificationRoutes = require('./routes/notifications');
 const dashboardRoutes = require('./routes/dashboard');
@@ -56,22 +59,54 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get('/api/v1/health', (req, res) => {
   res.json({
     status: 'ok',
+    service: 'video-editing-platform-api',
+    version: '2.0.0',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api', taskRoutes); // Handles /api/projects/:projectId/tasks and /api/tasks/:id
-app.use('/api/tasks', commentRoutes); // Handles /api/tasks/:taskId/comments
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/admin', adminRoutes);
+// =============================================================
+// API v1 Routes
+// =============================================================
+
+// Auth
+app.use('/api/v1/auth', authRoutes);
+
+// Clients
+app.use('/api/v1/clients', clientRoutes);
+
+// Projects (includes /api/v1/projects/:id/members)
+app.use('/api/v1/projects', projectRoutes);
+
+// Tasks
+// Handles: /api/v1/projects/:projectId/tasks AND /api/v1/tasks/:id
+app.use('/api/v1', taskRoutes);
+
+// Delivery Jobs
+// Handles: /api/v1/projects/:projectId/deliveries AND /api/v1/deliveries/:id
+app.use('/api/v1', deliveryRoutes);
+
+// Approvals
+// Handles: /api/v1/deliveries/:deliveryId/approve, reject, request-revision, approvals
+app.use('/api/v1', approvalRoutes);
+
+// Comments (polymorphic)
+app.use('/api/v1/comments', commentRoutes);
+
+// Notifications
+app.use('/api/v1/notifications', notificationRoutes);
+
+// Dashboard
+app.use('/api/v1/dashboard', dashboardRoutes);
+
+// Admin
+app.use('/api/v1/admin', adminRoutes);
+
+// =============================================================
 
 // 404 handler for unknown routes
 app.use((req, res) => {
@@ -85,7 +120,7 @@ app.use(errorHandler);
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Video Editing Platform API running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`CORS origin: ${corsOptions.origin}`);
 });

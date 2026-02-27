@@ -1,171 +1,250 @@
 const express = require('express');
 const Comment = require('../models/Comment');
-const Task = require('../models/Task');
 const Project = require('../models/Project');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
-const { parseMentions } = require('../utils/mentions');
+const { logAudit, getClientIp } = require('../utils/audit');
 const pool = require('../config/database');
 
 const router = express.Router();
 
-// GET /api/tasks/:taskId/comments - list comments
-router.get('/:taskId/comments', auth, async (req, res, next) => {
+// All routes require auth
+router.use(auth);
+
+/**
+ * Resolve the project_id for an entity so we can check access.
+ */
+async function getProjectIdForEntity(entityType, entityId) {
+  switch (entityType) {
+    case 'project':
+      return entityId;
+    case 'task': {
+      const { rows } = await pool.query('SELECT project_id FROM tasks WHERE id = $1', [entityId]);
+      return rows[0]?.project_id || null;
+    }
+    case 'delivery': {
+      const { rows } = await pool.query('SELECT project_id FROM delivery_jobs WHERE id = $1', [entityId]);
+      return rows[0]?.project_id || null;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Check if the entity exists.
+ */
+async function entityExists(entityType, entityId) {
+  let table;
+  switch (entityType) {
+    case 'project': table = 'projects'; break;
+    case 'task': table = 'tasks'; break;
+    case 'delivery': table = 'delivery_jobs'; break;
+    default: return false;
+  }
+  const { rows } = await pool.query(`SELECT id FROM ${table} WHERE id = $1`, [entityId]);
+  return rows.length > 0;
+}
+
+// GET /api/v1/comments?entity_type=project&entity_id=xxx
+router.get('/', async (req, res, next) => {
   try {
-    const task = await Task.findById(req.params.taskId);
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found.' });
+    const { entity_type, entity_id, limit = 100, offset = 0 } = req.query;
+
+    if (!entity_type || !entity_id) {
+      return res.status(400).json({ error: 'entity_type and entity_id are required.' });
     }
 
-    // Check membership
-    const membership = await Project.isMember(task.project_id, req.user.id);
-    if (!membership && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied.' });
+    const validTypes = ['project', 'task', 'delivery'];
+    if (!validTypes.includes(entity_type)) {
+      return res.status(400).json({ error: `Invalid entity_type. Must be one of: ${validTypes.join(', ')}.` });
     }
 
-    const comments = await Comment.findByTaskId(req.params.taskId);
+    // Check if entity exists
+    const exists = await entityExists(entity_type, entity_id);
+    if (!exists) {
+      return res.status(404).json({ error: `${entity_type} not found.` });
+    }
 
-    // Attach mentions to each comment
-    const commentsWithMentions = await Promise.all(
-      comments.map(async (comment) => {
-        const mentions = await Comment.getMentions(comment.id);
-        return { ...comment, mentions };
-      })
-    );
+    // Check project access
+    const projectId = await getProjectIdForEntity(entity_type, entity_id);
+    if (projectId && req.user.role !== 'admin' && req.user.role !== 'manager') {
+      const membership = await Project.isMember(projectId, req.user.id);
+      if (!membership) {
+        // Check client access
+        if (req.user.role === 'client') {
+          const { rows } = await pool.query(
+            `SELECT 1 FROM projects p
+             JOIN clients c ON p.client_id = c.id
+             JOIN users u ON u.email = c.email
+             WHERE p.id = $1 AND u.id = $2`,
+            [projectId, req.user.id]
+          );
+          if (rows.length === 0) {
+            return res.status(403).json({ error: 'Access denied.' });
+          }
+        } else {
+          return res.status(403).json({ error: 'Access denied.' });
+        }
+      }
+    }
 
-    res.json({ comments: commentsWithMentions });
+    const comments = await Comment.findByEntity(entity_type, entity_id, {
+      limit: Math.min(parseInt(limit, 10) || 100, 500),
+      offset: parseInt(offset, 10) || 0,
+    });
+
+    res.json({ comments });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/tasks/:taskId/comments - create comment
-router.post('/:taskId/comments', auth, async (req, res, next) => {
+// POST /api/v1/comments
+router.post('/', async (req, res, next) => {
   try {
-    const task = await Task.findById(req.params.taskId);
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found.' });
+    const { entity_type, entity_id, content } = req.body;
+
+    if (!entity_type || !entity_id || !content) {
+      return res.status(400).json({ error: 'entity_type, entity_id, and content are required.' });
     }
 
-    // Check membership
-    const membership = await Project.isMember(task.project_id, req.user.id);
-    if (!membership && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied.' });
+    const validTypes = ['project', 'task', 'delivery'];
+    if (!validTypes.includes(entity_type)) {
+      return res.status(400).json({ error: `Invalid entity_type. Must be one of: ${validTypes.join(', ')}.` });
     }
 
-    const { content } = req.body;
-
-    if (!content || typeof content !== 'string' || content.trim().length === 0) {
-      return res.status(400).json({ error: 'Comment content is required.' });
+    if (typeof content !== 'string' || content.trim().length === 0) {
+      return res.status(400).json({ error: 'Comment content cannot be empty.' });
     }
 
-    // Create comment
-    const comment = await Comment.create({
-      taskId: req.params.taskId,
-      userId: req.user.id,
-      content: content.trim(),
-    });
+    // Check if entity exists
+    const exists = await entityExists(entity_type, entity_id);
+    if (!exists) {
+      return res.status(404).json({ error: `${entity_type} not found.` });
+    }
 
-    // Parse @mentions and create mention records
-    const mentionedUsers = await parseMentions(content);
-    if (mentionedUsers.length > 0) {
-      const mentionUserIds = mentionedUsers.map((u) => u.id);
-      await Comment.addMentions(comment.id, mentionUserIds);
-
-      // Create mention notifications (exclude self)
-      const mentionNotifications = mentionedUsers
-        .filter((u) => u.id !== req.user.id)
-        .map((u) => ({
-          userId: u.id,
-          type: 'mention',
-          title: `${req.user.name} mentioned you in a comment`,
-          message: `In task "${task.title}": ${content.substring(0, 200)}`,
-          referenceId: task.id,
-          referenceType: 'task',
-        }));
-
-      if (mentionNotifications.length > 0) {
-        await Notification.createBulk(mentionNotifications);
-
-        const io = req.app.get('io');
-        if (io) {
-          for (const n of mentionNotifications) {
-            io.to(`user:${n.userId}`).emit('notification', {
-              type: 'mention',
-              title: n.title,
-              task_id: task.id,
-              comment_id: comment.id,
-            });
+    // Check project access
+    const projectId = await getProjectIdForEntity(entity_type, entity_id);
+    if (projectId && req.user.role !== 'admin' && req.user.role !== 'manager') {
+      const membership = await Project.isMember(projectId, req.user.id);
+      if (!membership) {
+        // Clients can comment on deliveries and projects
+        if (req.user.role === 'client' && (entity_type === 'delivery' || entity_type === 'project')) {
+          const { rows } = await pool.query(
+            `SELECT 1 FROM projects p
+             JOIN clients c ON p.client_id = c.id
+             JOIN users u ON u.email = c.email
+             WHERE p.id = $1 AND u.id = $2`,
+            [projectId, req.user.id]
+          );
+          if (rows.length === 0) {
+            return res.status(403).json({ error: 'Access denied.' });
           }
+        } else {
+          return res.status(403).json({ error: 'Access denied.' });
+        }
+      }
+
+      // Freelancers can comment on tasks assigned to them
+      if (req.user.role === 'freelancer' && entity_type === 'task') {
+        const { rows } = await pool.query(
+          'SELECT assignee_id FROM tasks WHERE id = $1',
+          [entity_id]
+        );
+        if (rows.length > 0 && rows[0].assignee_id !== req.user.id) {
+          return res.status(403).json({ error: 'Freelancers can only comment on tasks assigned to them.' });
         }
       }
     }
 
-    // Notify task assignee and reporter about the comment (if not self and not already mentioned)
-    const mentionedIds = new Set(mentionedUsers.map((u) => u.id));
+    const comment = await Comment.create({
+      entityType: entity_type,
+      entityId: entity_id,
+      userId: req.user.id,
+      content: content.trim(),
+    });
+
+    // Build notifications based on entity type
     const notifyUserIds = new Set();
 
-    if (task.assignee_id && task.assignee_id !== req.user.id && !mentionedIds.has(task.assignee_id)) {
-      notifyUserIds.add(task.assignee_id);
-    }
-    if (task.reporter_id && task.reporter_id !== req.user.id && !mentionedIds.has(task.reporter_id)) {
-      notifyUserIds.add(task.reporter_id);
+    if (entity_type === 'task') {
+      const { rows } = await pool.query(
+        'SELECT assignee_id, reporter_id, title FROM tasks WHERE id = $1',
+        [entity_id]
+      );
+      if (rows[0]) {
+        if (rows[0].assignee_id && rows[0].assignee_id !== req.user.id) notifyUserIds.add(rows[0].assignee_id);
+        if (rows[0].reporter_id && rows[0].reporter_id !== req.user.id) notifyUserIds.add(rows[0].reporter_id);
+      }
+    } else if (entity_type === 'delivery') {
+      const { rows } = await pool.query(
+        'SELECT uploaded_by, reviewed_by, title FROM delivery_jobs WHERE id = $1',
+        [entity_id]
+      );
+      if (rows[0]) {
+        if (rows[0].uploaded_by && rows[0].uploaded_by !== req.user.id) notifyUserIds.add(rows[0].uploaded_by);
+        if (rows[0].reviewed_by && rows[0].reviewed_by !== req.user.id) notifyUserIds.add(rows[0].reviewed_by);
+      }
+    } else if (entity_type === 'project' && projectId) {
+      // Notify all project managers
+      const members = await Project.getMembers(projectId);
+      members
+        .filter(m => m.project_role === 'manager' && m.id !== req.user.id)
+        .forEach(m => notifyUserIds.add(m.id));
     }
 
     if (notifyUserIds.size > 0) {
-      const commentNotifications = [];
+      const notifications = [];
       for (const uid of notifyUserIds) {
-        commentNotifications.push({
+        notifications.push({
           userId: uid,
           type: 'comment',
-          title: `New comment on "${task.title}"`,
+          title: `New comment on ${entity_type}`,
           message: `${req.user.name}: ${content.substring(0, 200)}`,
-          referenceId: task.id,
-          referenceType: 'task',
+          referenceId: entity_id,
+          referenceType: entity_type,
         });
       }
-      await Notification.createBulk(commentNotifications);
+      await Notification.createBulk(notifications);
 
       const io = req.app.get('io');
       if (io) {
         for (const uid of notifyUserIds) {
           io.to(`user:${uid}`).emit('notification', {
             type: 'comment',
-            title: `New comment on "${task.title}"`,
-            task_id: task.id,
+            entity_type,
+            entity_id,
             comment_id: comment.id,
           });
         }
       }
     }
 
-    // Log activity
-    await pool.query(
-      `INSERT INTO activity_log (project_id, user_id, action, entity_type, entity_id, details)
-       VALUES ($1, $2, 'commented', 'task', $3, $4)`,
-      [task.project_id, req.user.id, task.id, JSON.stringify({
-        task_title: task.title,
-        comment_preview: content.substring(0, 100),
-      })]
-    );
+    await logAudit({
+      userId: req.user.id,
+      action: 'create',
+      entityType: 'comment',
+      entityId: comment.id,
+      details: { on_entity_type: entity_type, on_entity_id: entity_id, preview: content.substring(0, 100) },
+      ipAddress: getClientIp(req),
+    });
 
     // Emit socket event to project room
-    const io = req.app.get('io');
-    if (io) {
-      io.to(`project:${task.project_id}`).emit('comment_added', {
-        ...comment,
-        user_name: req.user.name,
-        user_avatar: req.user.avatar_url,
-        task_id: task.id,
-        mentions: mentionedUsers,
-      });
+    if (projectId) {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`project:${projectId}`).emit('comment_added', {
+          ...comment,
+          user_name: req.user.name,
+          user_avatar: req.user.avatar_url,
+        });
+      }
     }
 
     // Fetch full comment with user info
     const fullComment = await Comment.findById(comment.id);
-    const mentions = await Comment.getMentions(comment.id);
-
-    res.status(201).json({ comment: { ...fullComment, mentions } });
+    res.status(201).json({ comment: fullComment });
   } catch (err) {
     next(err);
   }

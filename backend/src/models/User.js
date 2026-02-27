@@ -4,13 +4,13 @@ const bcrypt = require('bcrypt');
 const SALT_ROUNDS = 12;
 
 const User = {
-  async create({ name, email, password, role = 'member' }) {
+  async create({ name, email, password, role = 'editor', phone = null }) {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     const { rows } = await pool.query(
-      `INSERT INTO users (name, email, password_hash, role)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, email, avatar_url, role, created_at, updated_at`,
-      [name, email, passwordHash, role]
+      `INSERT INTO users (name, email, password_hash, role, phone)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, email, avatar_url, role, phone, created_at, updated_at`,
+      [name, email, passwordHash, role, phone]
     );
     return rows[0];
   },
@@ -25,7 +25,7 @@ const User = {
 
   async findById(id) {
     const { rows } = await pool.query(
-      'SELECT id, name, email, avatar_url, role, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, role, phone, created_at, updated_at FROM users WHERE id = $1',
       [id]
     );
     return rows[0] || null;
@@ -35,14 +35,14 @@ const User = {
     if (!ids || ids.length === 0) return [];
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
     const { rows } = await pool.query(
-      `SELECT id, name, email, avatar_url, role FROM users WHERE id IN (${placeholders})`,
+      `SELECT id, name, email, avatar_url, role, phone FROM users WHERE id IN (${placeholders})`,
       ids
     );
     return rows;
   },
 
   async update(id, fields) {
-    const allowed = ['name', 'avatar_url'];
+    const allowed = ['name', 'avatar_url', 'phone'];
     const setClauses = [];
     const values = [];
     let paramIndex = 1;
@@ -60,7 +60,7 @@ const User = {
     values.push(id);
     const { rows } = await pool.query(
       `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramIndex}
-       RETURNING id, name, email, avatar_url, role, created_at, updated_at`,
+       RETURNING id, name, email, avatar_url, role, phone, created_at, updated_at`,
       values
     );
     return rows[0] || null;
@@ -70,7 +70,7 @@ const User = {
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
     const { rows } = await pool.query(
       `UPDATE users SET password_hash = $1 WHERE id = $2
-       RETURNING id, name, email, avatar_url, role, created_at, updated_at`,
+       RETURNING id, name, email, avatar_url, role, phone, created_at, updated_at`,
       [passwordHash, id]
     );
     return rows[0] || null;
@@ -79,7 +79,7 @@ const User = {
   async updateRole(id, role) {
     const { rows } = await pool.query(
       `UPDATE users SET role = $1 WHERE id = $2
-       RETURNING id, name, email, avatar_url, role, created_at, updated_at`,
+       RETURNING id, name, email, avatar_url, role, phone, created_at, updated_at`,
       [role, id]
     );
     return rows[0] || null;
@@ -89,12 +89,21 @@ const User = {
     return bcrypt.compare(plainPassword, hash);
   },
 
-  async findAll({ limit = 50, offset = 0 } = {}) {
-    const { rows } = await pool.query(
-      `SELECT id, name, email, avatar_url, role, created_at, updated_at
-       FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+  async findAll({ limit = 50, offset = 0, role } = {}) {
+    let query = `SELECT id, name, email, avatar_url, role, phone, created_at, updated_at FROM users`;
+    const values = [];
+    let paramIndex = 1;
+
+    if (role) {
+      query += ` WHERE role = $${paramIndex}`;
+      values.push(role);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    values.push(limit, offset);
+
+    const { rows } = await pool.query(query, values);
     return rows;
   },
 
@@ -105,7 +114,7 @@ const User = {
 
   async searchByName(query) {
     const { rows } = await pool.query(
-      `SELECT id, name, email, avatar_url FROM users
+      `SELECT id, name, email, avatar_url, role, phone FROM users
        WHERE name ILIKE $1 OR email ILIKE $1
        LIMIT 20`,
       [`%${query}%`]

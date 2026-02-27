@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../../config/theme.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../config/api_config.dart';
 import '../../widgets/loading_widget.dart';
-import '../../widgets/empty_state.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -16,7 +18,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final ApiService _api = ApiService();
   Map<String, dynamic>? _stats;
   bool _isLoading = true;
-  String? _error;
 
   @override
   void initState() {
@@ -25,346 +26,445 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _loadStats() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      final response = await _api.get(ApiConfig.adminStats);
-      _stats = response['stats'] ?? response['data'] ?? response;
-    } catch (e) {
-      _error = e.toString();
+      final data = await _api.get(ApiConfig.adminStats);
+      setState(() => _stats = data);
+    } catch (_) {
+      // Use placeholder data for UI display
+      setState(() {
+        _stats = {
+          'total_users': 0,
+          'total_projects': 0,
+          'total_tasks': 0,
+          'total_deliveries': 0,
+          'active_projects': 0,
+          'completed_tasks': 0,
+          'pending_deliveries': 0,
+          'users_by_role': {
+            'admin': 0,
+            'manager': 0,
+            'editor': 0,
+            'freelancer': 0,
+            'client': 0,
+          },
+          'tasks_by_status': {
+            'todo': 0,
+            'in_progress': 0,
+            'review': 0,
+            'done': 0,
+          },
+        };
+      });
     }
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
+    setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
+    if (!auth.isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Painel Admin')),
+        body: const Center(
+          child: Text(
+            'Acesso restrito a administradores',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+        title: const Text('Painel Administrativo'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.people_outlined),
+            onPressed: () => Navigator.pushNamed(context, '/admin/users'),
+            tooltip: 'Gerenciar Usuarios',
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
             onPressed: _loadStats,
           ),
         ],
       ),
       body: _isLoading
-          ? const LoadingWidget(message: 'Loading dashboard...')
-          : _error != null
-              ? ErrorState(message: _error!, onRetry: _loadStats)
-              : RefreshIndicator(
-                  onRefresh: _loadStats,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          ? const LoadingWidget(message: 'Carregando estatisticas...')
+          : RefreshIndicator(
+              onRefresh: _loadStats,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Stats cards
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.4,
                       children: [
-                        // Welcome header
-                        const Text(
-                          'Overview',
-                          style: AppTheme.headingMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Platform statistics and management',
-                          style: AppTheme.bodyMedium.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Stats grid
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 1.4,
-                          children: [
-                            _buildStatCard(
-                              'Total Users',
-                              '${_stats?['totalUsers'] ?? 0}',
-                              Icons.people_rounded,
-                              AppTheme.primaryColor,
-                              '+${_stats?['newUsersThisWeek'] ?? 0} this week',
-                            ),
-                            _buildStatCard(
-                              'Total Projects',
-                              '${_stats?['totalProjects'] ?? 0}',
-                              Icons.folder_rounded,
-                              AppTheme.secondaryColor,
-                              '${_stats?['activeProjects'] ?? 0} active',
-                            ),
-                            _buildStatCard(
-                              'Total Tasks',
-                              '${_stats?['totalTasks'] ?? 0}',
-                              Icons.task_alt_rounded,
-                              AppTheme.warningColor,
-                              '${_stats?['completedTasks'] ?? 0} completed',
-                            ),
-                            _buildStatCard(
-                              'Active Today',
-                              '${_stats?['activeToday'] ?? 0}',
-                              Icons.trending_up_rounded,
-                              AppTheme.successColor,
-                              'users online',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Task status breakdown
-                        _buildTaskBreakdownCard(),
-                        const SizedBox(height: 24),
-
-                        // Quick actions
-                        Text('Quick Actions', style: AppTheme.headingSmall),
-                        const SizedBox(height: 12),
-                        _buildActionCard(
-                          Icons.people_rounded,
-                          'Manage Users',
-                          'View and manage all users',
+                        _buildStatCard(
+                          'Usuarios',
+                          '${_stats?['total_users'] ?? 0}',
+                          Icons.people,
                           AppTheme.primaryColor,
-                          () => Navigator.of(context).pushNamed('/admin-users'),
                         ),
-                        const SizedBox(height: 8),
-                        _buildActionCard(
-                          Icons.analytics_rounded,
-                          'View Reports',
-                          'Detailed analytics and reports',
+                        _buildStatCard(
+                          'Projetos',
+                          '${_stats?['total_projects'] ?? 0}',
+                          Icons.folder,
                           AppTheme.secondaryColor,
-                          () {},
                         ),
-                        const SizedBox(height: 8),
-                        _buildActionCard(
-                          Icons.settings_rounded,
-                          'System Settings',
-                          'Configure platform settings',
+                        _buildStatCard(
+                          'Tarefas',
+                          '${_stats?['total_tasks'] ?? 0}',
+                          Icons.task,
                           AppTheme.warningColor,
-                          () {},
                         ),
-                        const SizedBox(height: 32),
+                        _buildStatCard(
+                          'Entregas',
+                          '${_stats?['total_deliveries'] ?? 0}',
+                          Icons.video_file,
+                          AppTheme.successColor,
+                        ),
                       ],
                     ),
-                  ),
-                ),
-    );
-  }
-
-  Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-    String subtitle,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 22, color: color),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-              Text(
-                title,
-                style: AppTheme.caption.copyWith(fontSize: 12),
-              ),
-              Text(
-                subtitle,
-                style: AppTheme.caption.copyWith(
-                  fontSize: 10,
-                  color: AppTheme.textTertiary,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTaskBreakdownCard() {
-    final todo = _stats?['tasksByStatus']?['todo'] ?? 0;
-    final inProgress = _stats?['tasksByStatus']?['in_progress'] ?? 0;
-    final review = _stats?['tasksByStatus']?['review'] ?? 0;
-    final done = _stats?['tasksByStatus']?['done'] ?? 0;
-    final total = todo + inProgress + review + done;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Task Status Breakdown', style: AppTheme.headingSmall),
-          const SizedBox(height: 16),
-
-          // Progress bars
-          if (total > 0) ...[
-            // Combined progress bar
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                height: 12,
-                child: Row(
-                  children: [
-                    if (todo > 0)
-                      Flexible(
-                        flex: todo,
-                        child: Container(color: AppTheme.statusTodo),
+                    const SizedBox(height: 24),
+                    // Summary stats
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildMiniStat(
+                            'Projetos Ativos',
+                            '${_stats?['active_projects'] ?? 0}',
+                            AppTheme.primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildMiniStat(
+                            'Tarefas Concluidas',
+                            '${_stats?['completed_tasks'] ?? 0}',
+                            AppTheme.successColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildMiniStat(
+                            'Entregas Pendentes',
+                            '${_stats?['pending_deliveries'] ?? 0}',
+                            AppTheme.warningColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // Tasks by status chart
+                    const Text(
+                      'Tarefas por Status',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
                       ),
-                    if (inProgress > 0)
-                      Flexible(
-                        flex: inProgress,
-                        child: Container(color: AppTheme.statusInProgress),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 200,
+                      child: _buildTasksChart(),
+                    ),
+                    const SizedBox(height: 24),
+                    // Users by role
+                    const Text(
+                      'Usuarios por Cargo',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
                       ),
-                    if (review > 0)
-                      Flexible(
-                        flex: review,
-                        child: Container(color: AppTheme.statusReview),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 200,
+                      child: _buildUsersChart(),
+                    ),
+                    const SizedBox(height: 24),
+                    // Quick actions
+                    const Text(
+                      'Acoes Rapidas',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
                       ),
-                    if (done > 0)
-                      Flexible(
-                        flex: done,
-                        child: Container(color: AppTheme.statusDone),
+                    ),
+                    const SizedBox(height: 12),
+                    Card(
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.people_outlined,
+                                color: AppTheme.primaryColor),
+                            title: const Text('Gerenciar Usuarios'),
+                            subtitle:
+                                const Text('Adicionar, editar ou remover'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/admin/users'),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.folder_outlined,
+                                color: AppTheme.secondaryColor),
+                            title: const Text('Todos os Projetos'),
+                            subtitle: const Text('Visualizar e gerenciar'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.pop(context),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.history,
+                                color: AppTheme.warningColor),
+                            title: const Text('Log de Auditoria'),
+                            subtitle: const Text('Historico de acoes'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {},
+                          ),
+                        ],
                       ),
+                    ),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-          ],
-
-          // Legend
-          Row(
-            children: [
-              _buildLegendItem('To Do', todo, AppTheme.statusTodo),
-              _buildLegendItem('In Progress', inProgress, AppTheme.statusInProgress),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _buildLegendItem('Review', review, AppTheme.statusReview),
-              _buildLegendItem('Done', done, AppTheme.statusDone),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildLegendItem(String label, int count, Color color) {
-    return Expanded(
-      child: Row(
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 10,
-            height: 10,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
               color: color,
-              borderRadius: BorderRadius.circular(3),
             ),
           ),
-          const SizedBox(width: 6),
           Text(
-            '$label ($count)',
-            style: AppTheme.caption.copyWith(fontSize: 12),
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionCard(
-    IconData icon,
-    String title,
-    String subtitle,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 22),
+  Widget _buildMiniStat(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: AppTheme.labelMedium),
-                  Text(subtitle, style: AppTheme.caption),
-                ],
-              ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
             ),
-            Icon(Icons.chevron_right_rounded, color: AppTheme.textTertiary),
-          ],
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTasksChart() {
+    final tasksByStatus =
+        _stats?['tasks_by_status'] as Map<String, dynamic>? ?? {};
+    final todo = (tasksByStatus['todo'] ?? 0).toDouble();
+    final inProgress = (tasksByStatus['in_progress'] ?? 0).toDouble();
+    final review = (tasksByStatus['review'] ?? 0).toDouble();
+    final done = (tasksByStatus['done'] ?? 0).toDouble();
+    final total = todo + inProgress + review + done;
+
+    if (total == 0) {
+      return const Center(
+        child: Text(
+          'Sem dados disponíveis',
+          style: TextStyle(color: AppTheme.textTertiary),
         ),
+      );
+    }
+
+    return PieChart(
+      PieChartData(
+        sections: [
+          PieChartSectionData(
+            value: todo,
+            color: AppTheme.statusDraft,
+            title: 'A Fazer\n${todo.toInt()}',
+            titleStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white),
+            radius: 80,
+          ),
+          PieChartSectionData(
+            value: inProgress,
+            color: AppTheme.statusInProgress,
+            title: 'Progresso\n${inProgress.toInt()}',
+            titleStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white),
+            radius: 80,
+          ),
+          PieChartSectionData(
+            value: review,
+            color: AppTheme.statusReview,
+            title: 'Revisao\n${review.toInt()}',
+            titleStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white),
+            radius: 80,
+          ),
+          PieChartSectionData(
+            value: done,
+            color: AppTheme.statusCompleted,
+            title: 'Concluido\n${done.toInt()}',
+            titleStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.white),
+            radius: 80,
+          ),
+        ],
+        sectionsSpace: 3,
+        centerSpaceRadius: 0,
+      ),
+    );
+  }
+
+  Widget _buildUsersChart() {
+    final byRole =
+        _stats?['users_by_role'] as Map<String, dynamic>? ?? {};
+    final entries = byRole.entries.toList();
+
+    if (entries.isEmpty || entries.every((e) => (e.value ?? 0) == 0)) {
+      return const Center(
+        child: Text(
+          'Sem dados disponiveis',
+          style: TextStyle(color: AppTheme.textTertiary),
+        ),
+      );
+    }
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: entries.fold<double>(
+                0, (max, e) => (e.value ?? 0) > max ? e.value.toDouble() : max) +
+            2,
+        barTouchData: BarTouchData(enabled: false),
+        titlesData: FlTitlesData(
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                final idx = value.toInt();
+                if (idx >= 0 && idx < entries.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      AppTheme.getRoleLabel(entries[idx].key),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+        gridData: const FlGridData(show: false),
+        borderData: FlBorderData(show: false),
+        barGroups: entries.asMap().entries.map((entry) {
+          final color = AppTheme.getRoleColor(entry.value.key);
+          return BarChartGroupData(
+            x: entry.key,
+            barRods: [
+              BarChartRodData(
+                toY: (entry.value.value ?? 0).toDouble(),
+                color: color,
+                width: 28,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(6),
+                  topRight: Radius.circular(6),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }

@@ -5,11 +5,22 @@ import 'api_service.dart';
 class NotificationService {
   final ApiService _api = ApiService();
 
-  Future<List<AppNotification>> getNotifications() async {
-    final response = await _api.get(ApiConfig.notifications);
-    final List<dynamic> data =
-        response['notifications'] ?? response['data'] ?? response;
-    return data.map((json) => AppNotification.fromJson(json)).toList();
+  Future<List<AppNotification>> getNotifications({
+    bool? unreadOnly,
+    int? page,
+    int? limit,
+  }) async {
+    final params = <String, String>{};
+    if (unreadOnly == true) params['unread'] = 'true';
+    if (page != null) params['page'] = page.toString();
+    if (limit != null) params['limit'] = limit.toString();
+
+    final data =
+        await _api.get(ApiConfig.notifications, queryParams: params);
+    final list = data['notifications'] ?? data['data'] ?? data;
+    return (list as List)
+        .map((json) => AppNotification.fromJson(json))
+        .toList();
   }
 
   Future<void> markAsRead(String id) async {
@@ -17,15 +28,14 @@ class NotificationService {
   }
 
   Future<void> markAllAsRead() async {
-    await _api.patch(ApiConfig.notificationsReadAll);
+    await _api.post(ApiConfig.notificationsReadAll);
   }
 
   Future<int> getUnreadCount() async {
-    final response = await _api.get(ApiConfig.notifications);
-    final List<dynamic> data =
-        response['notifications'] ?? response['data'] ?? response;
-    return data
-        .where((n) => n['isRead'] == false)
-        .length;
+    final data = await _api.get(
+      ApiConfig.notifications,
+      queryParams: {'unread': 'true', 'count_only': 'true'},
+    );
+    return data['count'] ?? 0;
   }
 }

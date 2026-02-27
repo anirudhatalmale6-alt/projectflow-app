@@ -1,7 +1,7 @@
 const pool = require('../config/database');
 
 const Task = {
-  async create({ projectId, title, description, status = 'todo', priority = 'medium', assigneeId, reporterId, dueDate, parentTaskId }) {
+  async create({ projectId, title, description, status = 'todo', priority = 'medium', assigneeId, reporterId, dueDate, parentTaskId, estimatedHours, tags }) {
     // Get the next position for this status column
     const posResult = await pool.query(
       `SELECT COALESCE(MAX(position), -1) + 1 AS next_pos
@@ -11,17 +11,14 @@ const Task = {
     const position = posResult.rows[0].next_pos;
 
     const { rows } = await pool.query(
-      `INSERT INTO tasks (project_id, title, description, status, priority, assignee_id, reporter_id, due_date, position, parent_task_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO tasks (project_id, title, description, status, priority, assignee_id, reporter_id, due_date, position, parent_task_id, estimated_hours, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [projectId, title, description, status, priority, assigneeId || null, reporterId, dueDate || null, position, parentTaskId || null]
-    );
-
-    // Log activity
-    await pool.query(
-      `INSERT INTO activity_log (project_id, user_id, action, entity_type, entity_id, details)
-       VALUES ($1, $2, 'created', 'task', $3, $4)`,
-      [projectId, reporterId, rows[0].id, JSON.stringify({ title, status, priority })]
+      [
+        projectId, title, description || null, status, priority,
+        assigneeId || null, reporterId, dueDate || null, position,
+        parentTaskId || null, estimatedHours || null, tags || null,
+      ]
     );
 
     return rows[0];
@@ -49,7 +46,8 @@ const Task = {
         a.name AS assignee_name, a.email AS assignee_email, a.avatar_url AS assignee_avatar,
         r.name AS reporter_name, r.email AS reporter_email,
         (SELECT COUNT(*)::int FROM tasks sub WHERE sub.parent_task_id = t.id) AS subtask_count,
-        (SELECT COUNT(*)::int FROM tasks sub WHERE sub.parent_task_id = t.id AND sub.status = 'done') AS subtask_done_count
+        (SELECT COUNT(*)::int FROM tasks sub WHERE sub.parent_task_id = t.id AND sub.status = 'done') AS subtask_done_count,
+        (SELECT COUNT(*)::int FROM comments WHERE entity_type = 'task' AND entity_id = t.id) AS comment_count
       FROM tasks t
       LEFT JOIN users a ON t.assignee_id = a.id
       JOIN users r ON t.reporter_id = r.id
@@ -88,8 +86,8 @@ const Task = {
     return rows;
   },
 
-  async update(id, fields, userId) {
-    const allowed = ['title', 'description', 'status', 'priority', 'assignee_id', 'due_date', 'parent_task_id'];
+  async update(id, fields) {
+    const allowed = ['title', 'description', 'status', 'priority', 'assignee_id', 'due_date', 'parent_task_id', 'estimated_hours', 'actual_hours', 'tags'];
     const setClauses = [];
     const values = [];
     let paramIndex = 1;
@@ -113,22 +111,6 @@ const Task = {
       values
     );
 
-    if (rows[0] && userId) {
-      const changes = {};
-      for (const key of allowed) {
-        const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-        const value = fields[camelKey] !== undefined ? fields[camelKey] : fields[key];
-        if (value !== undefined) {
-          changes[key] = value;
-        }
-      }
-      await pool.query(
-        `INSERT INTO activity_log (project_id, user_id, action, entity_type, entity_id, details)
-         VALUES ($1, $2, 'updated', 'task', $3, $4)`,
-        [rows[0].project_id, userId, id, JSON.stringify(changes)]
-      );
-    }
-
     return rows[0] || null;
   },
 
@@ -137,7 +119,6 @@ const Task = {
     try {
       await client.query('BEGIN');
 
-      // Get the task's current info
       const taskResult = await client.query(
         'SELECT project_id, status AS old_status, position AS old_position FROM tasks WHERE id = $1',
         [id]
@@ -149,17 +130,14 @@ const Task = {
 
       const task = taskResult.rows[0];
 
-      // If moving within the same column, shift positions
       if (task.old_status === status) {
         if (position > task.old_position) {
-          // Moving down: decrement positions of items between old and new
           await client.query(
             `UPDATE tasks SET position = position - 1
              WHERE project_id = $1 AND status = $2 AND position > $3 AND position <= $4`,
             [task.project_id, status, task.old_position, position]
           );
         } else if (position < task.old_position) {
-          // Moving up: increment positions of items between new and old
           await client.query(
             `UPDATE tasks SET position = position + 1
              WHERE project_id = $1 AND status = $2 AND position >= $3 AND position < $4`,
@@ -167,15 +145,11 @@ const Task = {
           );
         }
       } else {
-        // Moving to different column
-        // Close gap in old column
         await client.query(
           `UPDATE tasks SET position = position - 1
            WHERE project_id = $1 AND status = $2 AND position > $3`,
           [task.project_id, task.old_status, task.old_position]
         );
-
-        // Make space in new column
         await client.query(
           `UPDATE tasks SET position = position + 1
            WHERE project_id = $1 AND status = $2 AND position >= $3`,
@@ -183,7 +157,6 @@ const Task = {
         );
       }
 
-      // Update the task itself
       const { rows } = await client.query(
         `UPDATE tasks SET status = $1, position = $2 WHERE id = $3 RETURNING *`,
         [status, position, id]
@@ -199,8 +172,7 @@ const Task = {
     }
   },
 
-  async delete(id, userId) {
-    // Get task info before deleting for activity log
+  async delete(id) {
     const taskResult = await pool.query(
       'SELECT project_id, title, status, position FROM tasks WHERE id = $1',
       [id]
@@ -212,26 +184,12 @@ const Task = {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-
-      // Delete the task
       await client.query('DELETE FROM tasks WHERE id = $1', [id]);
-
-      // Close the position gap
       await client.query(
         `UPDATE tasks SET position = position - 1
          WHERE project_id = $1 AND status = $2 AND position > $3`,
         [task.project_id, task.status, task.position]
       );
-
-      // Log activity
-      if (userId) {
-        await client.query(
-          `INSERT INTO activity_log (project_id, user_id, action, entity_type, entity_id, details)
-           VALUES ($1, $2, 'deleted', 'task', $3, $4)`,
-          [task.project_id, userId, id, JSON.stringify({ title: task.title })]
-        );
-      }
-
       await client.query('COMMIT');
       return true;
     } catch (err) {
@@ -256,7 +214,7 @@ const Task = {
 
   async findByAssignee(userId, { status } = {}) {
     let query = `
-      SELECT t.*, p.name AS project_name, p.color AS project_color
+      SELECT t.*, p.name AS project_name, p.status AS project_status
       FROM tasks t
       JOIN projects p ON t.project_id = p.id
       WHERE t.assignee_id = $1

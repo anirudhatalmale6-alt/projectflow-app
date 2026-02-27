@@ -5,123 +5,81 @@ import '../models/comment.dart';
 
 class CommentWidget extends StatelessWidget {
   final Comment comment;
-  final bool isOwn;
-  final VoidCallback? onEdit;
+  final bool canDelete;
   final VoidCallback? onDelete;
 
   const CommentWidget({
     super.key,
     required this.comment,
-    this.isOwn = false,
-    this.onEdit,
+    this.canDelete = false,
     this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppTheme.secondaryColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                comment.author?.initials ?? '?',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.secondaryColor,
-                ),
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppTheme.primaryColor.withOpacity(0.15),
+            child: Text(
+              comment.userInitials,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryColor,
               ),
             ),
           ),
-          const SizedBox(width: 10),
-
-          // Comment content
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header: name + time
                 Row(
                   children: [
                     Text(
-                      comment.author?.name ?? 'Unknown',
+                      comment.userName ?? 'Usuario',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textPrimary,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _formatTime(comment.createdAt),
-                      style: AppTheme.caption,
-                    ),
-                    if (comment.isEdited) ...[
-                      const SizedBox(width: 4),
+                    const Spacer(),
+                    if (comment.createdAt != null)
                       Text(
-                        '(edited)',
-                        style: AppTheme.caption.copyWith(
-                          fontStyle: FontStyle.italic,
-                          fontSize: 10,
+                        _timeAgo(comment.createdAt!),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textTertiary,
+                        ),
+                      ),
+                    if (canDelete) ...[
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: onDelete,
+                        child: const Icon(
+                          Icons.delete_outline,
+                          size: 16,
+                          color: AppTheme.textTertiary,
                         ),
                       ),
                     ],
-                    const Spacer(),
-                    if (isOwn)
-                      PopupMenuButton<String>(
-                        padding: EdgeInsets.zero,
-                        iconSize: 18,
-                        icon: Icon(
-                          Icons.more_horiz_rounded,
-                          color: AppTheme.textTertiary,
-                          size: 18,
-                        ),
-                        onSelected: (value) {
-                          if (value == 'edit') onEdit?.call();
-                          if (value == 'delete') onDelete?.call();
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'edit',
-                            child: Row(
-                              children: [
-                                Icon(Icons.edit_outlined, size: 18),
-                                SizedBox(width: 8),
-                                Text('Edit'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete_outline, size: 18,
-                                    color: AppTheme.errorColor),
-                                SizedBox(width: 8),
-                                Text('Delete',
-                                    style: TextStyle(color: AppTheme.errorColor)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
                   ],
                 ),
-
                 const SizedBox(height: 4),
-
-                // Comment text with mention highlighting
-                _buildCommentContent(comment.content),
+                Text(
+                  comment.content,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textPrimary,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),
@@ -130,50 +88,92 @@ class CommentWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCommentContent(String content) {
-    final mentionRegex = RegExp(r'@(\w+)');
-    final spans = <InlineSpan>[];
-    int lastEnd = 0;
+  String _timeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'Agora';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}min';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    return DateFormat('dd/MM/yyyy').format(dateTime);
+  }
+}
 
-    for (final match in mentionRegex.allMatches(content)) {
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(
-          text: content.substring(lastEnd, match.start),
-          style: AppTheme.bodyMedium,
-        ));
-      }
-      spans.add(TextSpan(
-        text: match.group(0),
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.primaryColor,
-          backgroundColor: AppTheme.primaryColor.withOpacity(0.08),
-        ),
-      ));
-      lastEnd = match.end;
-    }
-    if (lastEnd < content.length) {
-      spans.add(TextSpan(
-        text: content.substring(lastEnd),
-        style: AppTheme.bodyMedium,
-      ));
-    }
+class CommentInput extends StatefulWidget {
+  final Function(String) onSubmit;
+  final bool isLoading;
 
-    return RichText(text: TextSpan(children: spans));
+  const CommentInput({
+    super.key,
+    required this.onSubmit,
+    this.isLoading = false,
+  });
+
+  @override
+  State<CommentInput> createState() => _CommentInputState();
+}
+
+class _CommentInputState extends State<CommentInput> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
-  String _formatTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final diff = now.difference(dateTime);
+  void _submit() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    widget.onSubmit(text);
+    _controller.clear();
+  }
 
-    if (diff.inDays > 0) {
-      return DateFormat('MMM d, h:mm a').format(dateTime);
-    } else if (diff.inHours > 0) {
-      return '${diff.inHours}h ago';
-    } else if (diff.inMinutes > 0) {
-      return '${diff.inMinutes}m ago';
-    }
-    return 'just now';
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: AppTheme.dividerColor),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              decoration: const InputDecoration(
+                hintText: 'Escreva um comentario...',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              maxLines: 3,
+              minLines: 1,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _submit(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          widget.isLoading
+              ? const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : IconButton(
+                  onPressed: _submit,
+                  icon: const Icon(Icons.send_rounded),
+                  color: AppTheme.primaryColor,
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                  ),
+                ),
+        ],
+      ),
+    );
   }
 }

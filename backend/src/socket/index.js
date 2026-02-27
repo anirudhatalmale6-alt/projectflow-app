@@ -31,23 +31,47 @@ function setupSocket(io) {
 
   io.on('connection', async (socket) => {
     const user = socket.user;
-    console.log(`Socket connected: ${user.name} (${user.id})`);
+    console.log(`Socket connected: ${user.name} (${user.id}) [${user.role}]`);
 
     // Join personal room for direct notifications
     socket.join(`user:${user.id}`);
 
     // Join rooms for each project the user belongs to
     try {
-      const { rows: memberships } = await pool.query(
-        'SELECT project_id FROM project_members WHERE user_id = $1',
-        [user.id]
-      );
-
-      for (const membership of memberships) {
-        socket.join(`project:${membership.project_id}`);
+      if (user.role === 'admin' || user.role === 'manager') {
+        // Admin and managers join all project rooms
+        const { rows: allProjects } = await pool.query(
+          'SELECT id FROM projects WHERE status != $1',
+          ['archived']
+        );
+        for (const project of allProjects) {
+          socket.join(`project:${project.id}`);
+        }
+        console.log(`${user.name} (${user.role}) joined ${allProjects.length} project rooms`);
+      } else if (user.role === 'client') {
+        // Clients join rooms for projects linked to their client record
+        const { rows: clientProjects } = await pool.query(
+          `SELECT p.id FROM projects p
+           JOIN clients c ON p.client_id = c.id
+           JOIN users u ON u.email = c.email
+           WHERE u.id = $1`,
+          [user.id]
+        );
+        for (const project of clientProjects) {
+          socket.join(`project:${project.id}`);
+        }
+        console.log(`${user.name} (client) joined ${clientProjects.length} project rooms`);
+      } else {
+        // Editor/Freelancer join rooms for projects they are members of
+        const { rows: memberships } = await pool.query(
+          'SELECT project_id FROM project_members WHERE user_id = $1',
+          [user.id]
+        );
+        for (const membership of memberships) {
+          socket.join(`project:${membership.project_id}`);
+        }
+        console.log(`${user.name} joined ${memberships.length} project rooms`);
       }
-
-      console.log(`${user.name} joined ${memberships.length} project rooms`);
     } catch (err) {
       console.error('Error joining project rooms:', err.message);
     }
@@ -64,20 +88,22 @@ function setupSocket(io) {
       console.log(`${user.name} left project:${projectId}`);
     });
 
-    // Handle typing indicator in tasks
-    socket.on('typing', ({ projectId, taskId }) => {
+    // Handle typing indicator
+    socket.on('typing', ({ projectId, entityType, entityId }) => {
       socket.to(`project:${projectId}`).emit('user_typing', {
         user_id: user.id,
         user_name: user.name,
-        task_id: taskId,
+        entity_type: entityType,
+        entity_id: entityId,
       });
     });
 
     // Handle stop typing
-    socket.on('stop_typing', ({ projectId, taskId }) => {
+    socket.on('stop_typing', ({ projectId, entityType, entityId }) => {
       socket.to(`project:${projectId}`).emit('user_stop_typing', {
         user_id: user.id,
-        task_id: taskId,
+        entity_type: entityType,
+        entity_id: entityId,
       });
     });
 

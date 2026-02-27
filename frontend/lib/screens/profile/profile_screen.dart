@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/role_badge.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -11,309 +12,360 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _isEditing = false;
+  bool _isEditingName = false;
+  bool _isEditingPhone = false;
   final _nameController = TextEditingController();
-  bool _isUpdating = false;
-
-  @override
-  void initState() {
-    super.initState();
-    final user = context.read<AuthProvider>().user;
-    if (user != null) {
-      _nameController.text = user.name;
-    }
-  }
+  final _phoneController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
-  }
-
-  Future<void> _handleUpdate() async {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) return;
-
-    setState(() => _isUpdating = true);
-
-    try {
-      await context.read<AuthProvider>().updateProfile({'name': name});
-      setState(() {
-        _isEditing = false;
-        _isUpdating = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully'),
-            backgroundColor: AppTheme.successColor,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _isUpdating = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update profile: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _handleLogout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    await context.read<AuthProvider>().logout();
-    if (mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
+
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('Usuario nao encontrado')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('Perfil'),
         actions: [
-          if (context.read<AuthProvider>().isAdmin)
+          if (auth.isAdmin)
             IconButton(
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              onPressed: () {
-                Navigator.of(context).pushNamed('/admin-dashboard');
-              },
-              tooltip: 'Admin Dashboard',
+              icon: const Icon(Icons.admin_panel_settings),
+              onPressed: () => Navigator.pushNamed(context, '/admin'),
+              tooltip: 'Painel Admin',
             ),
         ],
       ),
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
-          final user = authProvider.user;
-          if (user == null) {
-            return const Center(child: Text('Not logged in'));
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Avatar section
-                const SizedBox(height: 16),
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryColor.withOpacity(0.3),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Center(
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
+            // Avatar
+            Center(
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: AppTheme.primaryColor,
                     child: Text(
                       user.initials,
                       style: const TextStyle(
-                        fontSize: 36,
+                        fontSize: 32,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                // Name (editable)
-                if (_isEditing) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: TextFormField(
-                      controller: _nameController,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        hintText: 'Your name',
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondaryColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
-                      autofocus: true,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          _nameController.text = user.name;
-                          setState(() => _isEditing = false);
-                        },
-                        child: const Text('Cancel'),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: _isUpdating ? null : _handleUpdate,
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(100, 40),
-                        ),
-                        child: _isUpdating
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
-                                ),
-                              )
-                            : const Text('Save'),
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  Text(user.name, style: AppTheme.headingMedium),
-                  const SizedBox(height: 4),
-                  Text(
-                    user.email,
-                    style: AppTheme.bodyMedium.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: user.isAdmin
-                          ? AppTheme.secondaryColor.withOpacity(0.1)
-                          : AppTheme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      user.role.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: user.isAdmin
-                            ? AppTheme.secondaryColor
-                            : AppTheme.primaryColor,
-                        letterSpacing: 0.5,
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: Colors.white,
                       ),
                     ),
                   ),
                 ],
-                const SizedBox(height: 32),
-
-                // Menu items
-                _buildMenuItem(
-                  Icons.edit_outlined,
-                  'Edit Name',
-                  'Change your display name',
-                  onTap: () => setState(() => _isEditing = true),
-                ),
-                _buildMenuItem(
-                  Icons.color_lens_outlined,
-                  'Appearance',
-                  'Theme and display settings',
-                  onTap: () {},
-                ),
-                _buildMenuItem(
-                  Icons.notifications_outlined,
-                  'Notification Settings',
-                  'Configure push notifications',
-                  onTap: () {},
-                ),
-                _buildMenuItem(
-                  Icons.security_outlined,
-                  'Security',
-                  'Password and security options',
-                  onTap: () {},
-                ),
-                _buildMenuItem(
-                  Icons.info_outline_rounded,
-                  'About',
-                  'Version 1.0.0',
-                  onTap: () {},
-                ),
-                const SizedBox(height: 16),
-
-                // Logout button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _handleLogout,
-                    icon: const Icon(Icons.logout_rounded),
-                    label: const Text('Logout'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.errorColor,
-                      side: const BorderSide(color: AppTheme.errorColor),
-                      minimumSize: const Size(double.infinity, 52),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              user.name,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              user.email,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            RoleBadge(role: user.role, fontSize: 13),
+            const SizedBox(height: 32),
+            // Info cards
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  _buildInfoCard(
+                    icon: Icons.person_outlined,
+                    label: 'Nome',
+                    value: user.name,
+                    isEditing: _isEditingName,
+                    controller: _nameController,
+                    onEdit: () {
+                      _nameController.text = user.name;
+                      setState(() => _isEditingName = true);
+                    },
+                    onSave: () async {
+                      if (_nameController.text.trim().isNotEmpty) {
+                        await auth.updateProfile(
+                            {'name': _nameController.text.trim()});
+                      }
+                      setState(() => _isEditingName = false);
+                    },
+                    onCancel: () =>
+                        setState(() => _isEditingName = false),
+                  ),
+                  _buildInfoCard(
+                    icon: Icons.email_outlined,
+                    label: 'E-mail',
+                    value: user.email,
+                  ),
+                  _buildInfoCard(
+                    icon: Icons.phone_outlined,
+                    label: 'Telefone',
+                    value: user.phone ?? 'Nao informado',
+                    isEditing: _isEditingPhone,
+                    controller: _phoneController,
+                    onEdit: () {
+                      _phoneController.text = user.phone ?? '';
+                      setState(() => _isEditingPhone = true);
+                    },
+                    onSave: () async {
+                      await auth.updateProfile(
+                          {'phone': _phoneController.text.trim()});
+                      setState(() => _isEditingPhone = false);
+                    },
+                    onCancel: () =>
+                        setState(() => _isEditingPhone = false),
+                  ),
+                  _buildInfoCard(
+                    icon: Icons.badge_outlined,
+                    label: 'Cargo',
+                    value: AppTheme.getRoleLabel(user.role),
+                  ),
+                  const SizedBox(height: 20),
+                  // Settings section
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Configuracoes',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 32),
-              ],
+                  const SizedBox(height: 12),
+                  _buildSettingTile(
+                    icon: Icons.notifications_outlined,
+                    title: 'Notificacoes',
+                    subtitle: 'Gerenciar preferencias de notificacao',
+                    onTap: () {},
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.language,
+                    title: 'Idioma',
+                    subtitle: 'Portugues (Brasil)',
+                    onTap: () {},
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.dark_mode_outlined,
+                    title: 'Aparencia',
+                    subtitle: 'Tema claro',
+                    onTap: () {},
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.info_outlined,
+                    title: 'Sobre',
+                    subtitle: 'VideoFlow v1.0.0',
+                    onTap: () {},
+                  ),
+                  const SizedBox(height: 24),
+                  // Logout button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _confirmLogout(),
+                      icon: const Icon(Icons.logout, color: AppTheme.errorColor),
+                      label: const Text(
+                        'Sair da Conta',
+                        style: TextStyle(
+                          color: AppTheme.errorColor,
+                          fontSize: 16,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppTheme.errorColor),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildMenuItem(
-    IconData icon,
-    String title,
-    String subtitle, {
-    VoidCallback? onTap,
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool isEditing = false,
+    TextEditingController? controller,
+    VoidCallback? onEdit,
+    VoidCallback? onSave,
+    VoidCallback? onCancel,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppTheme.dividerColor),
       ),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(10),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: AppTheme.textSecondary),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textTertiary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                isEditing && controller != null
+                    ? TextField(
+                        controller: controller,
+                        autofocus: true,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          border: InputBorder.none,
+                        ),
+                      )
+                    : Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+              ],
+            ),
           ),
-          child: Icon(icon, size: 20, color: AppTheme.primaryColor),
+          if (isEditing) ...[
+            IconButton(
+              icon: const Icon(Icons.check, color: AppTheme.successColor),
+              onPressed: onSave,
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: AppTheme.textTertiary),
+              onPressed: onCancel,
+              visualDensity: VisualDensity.compact,
+            ),
+          ] else if (onEdit != null)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined,
+                  size: 18, color: AppTheme.textTertiary),
+              onPressed: onEdit,
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: ListTile(
+        leading: Icon(icon, color: AppTheme.textSecondary),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        title: Text(title, style: AppTheme.labelMedium),
-        subtitle: Text(subtitle, style: AppTheme.caption),
-        trailing: const Icon(Icons.chevron_right_rounded,
-            color: AppTheme.textTertiary),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: AppTheme.textTertiary),
         onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+      ),
+    );
+  }
+
+  void _confirmLogout() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sair da Conta'),
+        content: const Text('Tem certeza que deseja sair?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await context.read<AuthProvider>().logout();
+              if (mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                    context, '/login', (_) => false);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.errorColor),
+            child: const Text('Sair'),
+          ),
+        ],
       ),
     );
   }

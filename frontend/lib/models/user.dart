@@ -2,73 +2,74 @@ class User {
   final String id;
   final String name;
   final String email;
+  final String? avatarUrl;
   final String role;
-  final String? avatar;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final String? phone;
 
   User({
     required this.id,
     required this.name,
     required this.email,
+    this.avatarUrl,
     required this.role,
-    this.avatar,
-    required this.createdAt,
-    required this.updatedAt,
+    this.phone,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['_id'] ?? json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
-      role: json['role'] ?? 'member',
-      avatar: json['avatar'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
-          : DateTime.now(),
+      avatarUrl: json['avatar_url'],
+      role: json['role'] ?? 'editor',
+      phone: json['phone'],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      '_id': id,
+      'id': id,
       'name': name,
       'email': email,
+      'avatar_url': avatarUrl,
       'role': role,
-      'avatar': avatar,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'phone': phone,
     };
   }
 
   bool get isAdmin => role == 'admin';
+  bool get isManager => role == 'manager';
+  bool get isEditor => role == 'editor';
+  bool get isFreelancer => role == 'freelancer';
+  bool get isClient => role == 'client';
+  bool get canManageProjects => isAdmin || isManager;
+  bool get canManageUsers => isAdmin;
+  bool get canAssignTasks => isAdmin || isManager;
+  bool get canApproveDeliveries => isAdmin || isManager || isClient;
 
   String get initials {
     final parts = name.trim().split(' ');
     if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
 
   User copyWith({
+    String? id,
     String? name,
     String? email,
+    String? avatarUrl,
     String? role,
-    String? avatar,
+    String? phone,
   }) {
     return User(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       role: role ?? this.role,
-      avatar: avatar ?? this.avatar,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
+      phone: phone ?? this.phone,
     );
   }
 }

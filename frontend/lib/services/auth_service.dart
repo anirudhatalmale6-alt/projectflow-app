@@ -6,71 +6,57 @@ class AuthService {
   final ApiService _api = ApiService();
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final response = await _api.post(
+    final data = await _api.post(
       ApiConfig.login,
-      body: {
-        'email': email,
-        'password': password,
-      },
-      auth: false,
+      body: {'email': email, 'password': password},
     );
-
-    final token = response['token'] ?? response['accessToken'];
-    final userData = response['user'] ?? response['data'];
-
-    if (token != null) {
-      await _api.setToken(token);
-    }
-
-    return {
-      'token': token,
-      'user': userData != null ? User.fromJson(userData) : null,
-    };
+    final accessToken = data['access_token'] ?? data['token'];
+    final refreshToken = data['refresh_token'] ?? '';
+    await _api.saveTokens(accessToken, refreshToken);
+    return data;
   }
 
-  Future<Map<String, dynamic>> register(
-      String name, String email, String password) async {
-    final response = await _api.post(
+  Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final data = await _api.post(
       ApiConfig.register,
       body: {
         'name': name,
         'email': email,
         'password': password,
+        'password_confirmation': passwordConfirmation,
       },
-      auth: false,
     );
-
-    final token = response['token'] ?? response['accessToken'];
-    final userData = response['user'] ?? response['data'];
-
-    if (token != null) {
-      await _api.setToken(token);
+    if (data['access_token'] != null || data['token'] != null) {
+      final accessToken = data['access_token'] ?? data['token'];
+      final refreshToken = data['refresh_token'] ?? '';
+      await _api.saveTokens(accessToken, refreshToken);
     }
-
-    return {
-      'token': token,
-      'user': userData != null ? User.fromJson(userData) : null,
-    };
+    return data;
   }
 
-  Future<User> getProfile() async {
-    final response = await _api.get(ApiConfig.profile);
-    final userData = response['user'] ?? response['data'] ?? response;
-    return User.fromJson(userData);
+  Future<User> me() async {
+    final data = await _api.get(ApiConfig.me);
+    return User.fromJson(data['user'] ?? data);
   }
 
-  Future<User> updateProfile(Map<String, dynamic> data) async {
-    final response = await _api.put(ApiConfig.updateProfile, body: data);
-    final userData = response['user'] ?? response['data'] ?? response;
-    return User.fromJson(userData);
+  Future<User> updateProfile(Map<String, dynamic> updates) async {
+    final data = await _api.put(ApiConfig.updateProfile, body: updates);
+    return User.fromJson(data['user'] ?? data);
   }
 
   Future<void> logout() async {
-    await _api.setToken(null);
+    try {
+      await _api.post(ApiConfig.logout);
+    } catch (_) {}
+    await _api.clearTokens();
   }
 
-  Future<bool> isLoggedIn() async {
-    final token = await _api.token;
-    return token != null && token.isNotEmpty;
+  Future<void> refresh() async {
+    await _api.loadTokens();
   }
 }

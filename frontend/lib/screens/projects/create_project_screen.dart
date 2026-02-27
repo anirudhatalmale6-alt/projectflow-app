@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../../config/theme.dart';
+import '../../models/project.dart';
 import '../../providers/project_provider.dart';
+import '../../widgets/loading_widget.dart';
 
 class CreateProjectScreen extends StatefulWidget {
   const CreateProjectScreen({super.key});
@@ -14,206 +18,316 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  Color _selectedColor = AppTheme.projectColors[0];
-  bool _isSubmitting = false;
+  final _budgetController = TextEditingController();
+
+  String _currency = 'BRL';
+  DateTime? _deadline;
+  String? _clientId;
+  String? _clientName;
+  Color _color = AppTheme.primaryColor;
+  String _status = 'draft';
+  bool _isEditing = false;
+  String? _editId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final arg = ModalRoute.of(context)?.settings.arguments;
+    if (arg is Project && !_isEditing) {
+      _isEditing = true;
+      _editId = arg.id;
+      _nameController.text = arg.name;
+      _descriptionController.text = arg.description ?? '';
+      _budgetController.text = arg.budget?.toString() ?? '';
+      _currency = arg.currency ?? 'BRL';
+      _deadline = arg.deadline;
+      _clientId = arg.clientId;
+      _clientName = arg.clientName;
+      _status = arg.status;
+      if (arg.color != null) {
+        try {
+          _color = Color(int.parse('0xFF${arg.color!.replaceAll('#', '')}'));
+        } catch (_) {}
+      }
+    }
+
+    // Load clients
+    context.read<ProjectProvider>().loadClients();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _budgetController.dispose();
     super.dispose();
   }
 
-  String _colorToHex(Color color) {
-    return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
+  Future<void> _selectDeadline() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _deadline ?? DateTime.now().add(const Duration(days: 14)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
+      locale: const Locale('pt', 'BR'),
+    );
+    if (picked != null) {
+      setState(() => _deadline = picked);
+    }
   }
 
-  Future<void> _handleCreate() async {
+  void _pickColor() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cor do Projeto'),
+        content: SingleChildScrollView(
+          child: BlockPicker(
+            pickerColor: _color,
+            onColorChanged: (color) {
+              setState(() => _color = color);
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isSubmitting = true);
-
     final provider = context.read<ProjectProvider>();
-    final project = await provider.createProject({
+    final colorHex =
+        '#${_color.value.toRadixString(16).substring(2).toUpperCase()}';
+
+    final data = {
       'name': _nameController.text.trim(),
       'description': _descriptionController.text.trim(),
-      'color': _colorToHex(_selectedColor),
-    });
+      'status': _status,
+      if (_clientId != null) 'client_id': _clientId,
+      if (_deadline != null) 'deadline': _deadline!.toIso8601String(),
+      if (_budgetController.text.isNotEmpty)
+        'budget': double.tryParse(_budgetController.text),
+      'currency': _currency,
+      'color': colorHex,
+    };
 
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
-
-    if (project != null) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Project created successfully'),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
+    bool success;
+    if (_isEditing) {
+      success = await provider.updateProject(_editId!, data);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(provider.errorMessage ?? 'Failed to create project'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      final project = await provider.createProject(data);
+      success = project != null;
+    }
+
+    if (success && mounted) {
+      Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<ProjectProvider>();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Project'),
+        title: Text(_isEditing ? 'Editar Projeto' : 'Novo Projeto'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Preview card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _selectedColor,
-                  borderRadius: BorderRadius.circular(16),
+      body: LoadingOverlay(
+        isLoading: provider.isLoading,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome do Projeto *',
+                    hintText: 'Ex: Video Institucional - Empresa X',
+                    prefixIcon: Icon(Icons.movie_outlined),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Informe o nome do projeto';
+                    }
+                    return null;
+                  },
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.folder_rounded,
-                      size: 40,
-                      color: Colors.white.withOpacity(0.7),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _descriptionController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Descricao',
+                    hintText: 'Descreva o projeto...',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Client selector
+                DropdownButtonFormField<String>(
+                  value: _clientId,
+                  decoration: const InputDecoration(
+                    labelText: 'Cliente',
+                    prefixIcon: Icon(Icons.business_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Sem cliente'),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _nameController.text.isEmpty
-                          ? 'Project Name'
-                          : _nameController.text,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
+                    ...provider.clients.map((client) {
+                      return DropdownMenuItem(
+                        value: client.id,
+                        child: Text(client.displayName),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _clientId = value;
+                      _clientName = provider.clients
+                          .where((c) => c.id == value)
+                          .map((c) => c.name)
+                          .firstOrNull;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Status
+                if (_isEditing)
+                  DropdownButtonFormField<String>(
+                    value: _status,
+                    decoration: const InputDecoration(
+                      labelText: 'Status',
+                      prefixIcon: Icon(Icons.flag_outlined),
                     ),
-                    if (_descriptionController.text.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _descriptionController.text,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.8),
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    items: const [
+                      DropdownMenuItem(value: 'draft', child: Text('Rascunho')),
+                      DropdownMenuItem(
+                          value: 'in_progress', child: Text('Em Progresso')),
+                      DropdownMenuItem(
+                          value: 'review', child: Text('Em Revisao')),
+                      DropdownMenuItem(
+                          value: 'delivered', child: Text('Entregue')),
+                      DropdownMenuItem(
+                          value: 'completed', child: Text('Concluido')),
+                      DropdownMenuItem(
+                          value: 'archived', child: Text('Arquivado')),
                     ],
+                    onChanged: (value) =>
+                        setState(() => _status = value ?? 'draft'),
+                  ),
+                if (_isEditing) const SizedBox(height: 16),
+                // Deadline
+                InkWell(
+                  onTap: _selectDeadline,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Prazo de Entrega',
+                      prefixIcon: Icon(Icons.calendar_today_outlined),
+                      suffixIcon: Icon(Icons.arrow_drop_down),
+                    ),
+                    child: Text(
+                      _deadline != null
+                          ? DateFormat('dd/MM/yyyy').format(_deadline!)
+                          : 'Selecionar data',
+                      style: TextStyle(
+                        color: _deadline != null
+                            ? AppTheme.textPrimary
+                            : AppTheme.textTertiary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Budget row
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 100,
+                      child: DropdownButtonFormField<String>(
+                        value: _currency,
+                        decoration: const InputDecoration(
+                          labelText: 'Moeda',
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'BRL', child: Text('R\$')),
+                          DropdownMenuItem(value: 'USD', child: Text('US\$')),
+                          DropdownMenuItem(value: 'EUR', child: Text('EUR')),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _currency = v ?? 'BRL'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _budgetController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Orcamento',
+                          hintText: '0.00',
+                          prefixIcon: Icon(Icons.attach_money),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-
-              // Project Name
-              Text('Project Name', style: AppTheme.labelMedium),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _nameController,
-                textInputAction: TextInputAction.next,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  hintText: 'Enter project name',
-                  prefixIcon: Icon(Icons.folder_outlined),
-                ),
-                onChanged: (_) => setState(() {}),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a project name';
-                  }
-                  if (value.trim().length < 2) {
-                    return 'Name must be at least 2 characters';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Description
-              Text('Description', style: AppTheme.labelMedium),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _descriptionController,
-                textCapitalization: TextCapitalization.sentences,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  hintText: 'Describe your project (optional)',
-                  alignLabelWithHint: true,
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 20),
-
-              // Color Picker
-              Text('Project Color', style: AppTheme.labelMedium),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: AppTheme.projectColors.map((color) {
-                  final isSelected = _selectedColor == color;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedColor = color),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: isSelected
-                            ? Border.all(color: Colors.white, width: 3)
-                            : null,
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: color.withOpacity(0.4),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: isSelected
-                          ? const Icon(Icons.check_rounded,
-                              color: Colors.white, size: 22)
-                          : null,
+                const SizedBox(height: 16),
+                // Color picker
+                InkWell(
+                  onTap: _pickColor,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Cor do Projeto',
+                      prefixIcon: Icon(Icons.palette_outlined),
                     ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 32),
-
-              // Create button
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _handleCreate,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: _color,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppTheme.dividerColor),
+                          ),
                         ),
-                      )
-                    : const Text('Create Project'),
-              ),
-              const SizedBox(height: 16),
-            ],
+                        const SizedBox(width: 12),
+                        Text(
+                          '#${_color.value.toRadixString(16).substring(2).toUpperCase()}',
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _save,
+                    child: Text(
+                      _isEditing ? 'Salvar Alteracoes' : 'Criar Projeto',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

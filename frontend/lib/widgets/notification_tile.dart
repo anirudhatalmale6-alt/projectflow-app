@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../config/theme.dart';
 import '../models/notification.dart';
 
@@ -12,46 +13,48 @@ class NotificationTile extends StatelessWidget {
     this.onTap,
   });
 
-  Color get _iconColor {
-    switch (notification.iconType) {
-      case IconType.taskAssigned:
-        return AppTheme.primaryColor;
-      case IconType.taskUpdated:
-        return AppTheme.warningColor;
-      case IconType.taskCompleted:
-        return AppTheme.successColor;
-      case IconType.comment:
-        return AppTheme.secondaryColor;
-      case IconType.mention:
-        return AppTheme.infoColor;
-      case IconType.projectInvite:
-        return AppTheme.primaryColor;
-      case IconType.general:
-        return AppTheme.textSecondary;
+  IconData _getTypeIcon() {
+    switch (notification.type) {
+      case 'project':
+        return Icons.folder_outlined;
+      case 'task':
+        return Icons.task_outlined;
+      case 'delivery':
+        return Icons.video_file_outlined;
+      case 'comment':
+        return Icons.comment_outlined;
+      case 'approval':
+        return Icons.check_circle_outline;
+      case 'member':
+        return Icons.group_outlined;
+      default:
+        return Icons.notifications_outlined;
     }
   }
 
-  IconData get _iconData {
-    switch (notification.iconType) {
-      case IconType.taskAssigned:
-        return Icons.assignment_ind_outlined;
-      case IconType.taskUpdated:
-        return Icons.update_rounded;
-      case IconType.taskCompleted:
-        return Icons.check_circle_outline_rounded;
-      case IconType.comment:
-        return Icons.chat_bubble_outline_rounded;
-      case IconType.mention:
-        return Icons.alternate_email_rounded;
-      case IconType.projectInvite:
-        return Icons.group_add_outlined;
-      case IconType.general:
-        return Icons.notifications_outlined;
+  Color _getTypeColor() {
+    switch (notification.type) {
+      case 'project':
+        return AppTheme.primaryColor;
+      case 'task':
+        return AppTheme.secondaryColor;
+      case 'delivery':
+        return const Color(0xFFF59E0B);
+      case 'comment':
+        return const Color(0xFF06B6D4);
+      case 'approval':
+        return AppTheme.successColor;
+      case 'member':
+        return const Color(0xFFEC4899);
+      default:
+        return AppTheme.textSecondary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final typeColor = _getTypeColor();
+
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -59,25 +62,26 @@ class NotificationTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: notification.isRead ? Colors.transparent : AppTheme.primaryColor.withOpacity(0.04),
           border: Border(
-            bottom: BorderSide(color: Colors.grey.shade200),
+            bottom: BorderSide(color: AppTheme.dividerColor),
           ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: _iconColor.withOpacity(0.1),
-                shape: BoxShape.circle,
+                color: typeColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(_iconData, size: 20, color: _iconColor),
+              child: Icon(
+                _getTypeIcon(),
+                color: typeColor,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 12),
-
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,7 +91,7 @@ class NotificationTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: notification.isRead
-                          ? FontWeight.w400
+                          ? FontWeight.w500
                           : FontWeight.w600,
                       color: AppTheme.textPrimary,
                     ),
@@ -97,34 +101,48 @@ class NotificationTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     notification.message,
-                    style: AppTheme.bodySmall,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                      height: 1.3,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    notification.timeAgo,
-                    style: AppTheme.caption.copyWith(fontSize: 11),
-                  ),
+                  if (notification.createdAt != null)
+                    Text(
+                      _timeAgo(notification.createdAt!),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textTertiary,
+                      ),
+                    ),
                 ],
               ),
             ),
-
-            // Unread indicator
-            if (!notification.isRead) ...[
-              const SizedBox(width: 8),
+            if (!notification.isRead)
               Container(
                 width: 8,
                 height: 8,
+                margin: const EdgeInsets.only(top: 6),
                 decoration: const BoxDecoration(
                   color: AppTheme.primaryColor,
                   shape: BoxShape.circle,
                 ),
               ),
-            ],
           ],
         ),
       ),
     );
+  }
+
+  String _timeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'Agora';
+    if (diff.inMinutes < 60) return 'Ha ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'Ha ${diff.inHours}h';
+    if (diff.inDays < 7) return 'Ha ${diff.inDays} dias';
+    return DateFormat('dd/MM/yyyy').format(dateTime);
   }
 }

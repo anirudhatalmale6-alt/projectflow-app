@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/project_provider.dart';
 import '../../widgets/project_card.dart';
 import '../../widgets/loading_widget.dart';
@@ -14,6 +15,10 @@ class ProjectsListScreen extends StatefulWidget {
 }
 
 class _ProjectsListScreenState extends State<ProjectsListScreen> {
+  String? _statusFilter;
+  final _searchController = TextEditingController();
+  bool _isSearching = false;
+
   @override
   void initState() {
     super.initState();
@@ -23,69 +28,153 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyFilter() {
+    context.read<ProjectProvider>().loadProjects(
+          status: _statusFilter,
+          search: _searchController.text.trim().isNotEmpty
+              ? _searchController.text.trim()
+              : null,
+        );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final projectProvider = context.watch<ProjectProvider>();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Projects'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Buscar projetos...',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                ),
+                onSubmitted: (_) => _applyFilter(),
+              )
+            : const Text('Projetos'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search_rounded),
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
             onPressed: () {
-              // Could open a search delegate
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _applyFilter();
+                }
+              });
             },
+          ),
+          if (auth.isAdmin)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              onPressed: () => Navigator.pushNamed(context, '/admin'),
+              tooltip: 'Painel Admin',
+            ),
+          if (auth.canManageProjects)
+            IconButton(
+              icon: const Icon(Icons.people_outlined),
+              onPressed: () => Navigator.pushNamed(context, '/clients'),
+              tooltip: 'Clientes',
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Status filter chips
+          SizedBox(
+            height: 50,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildFilterChip('Todos', null),
+                _buildFilterChip('Rascunho', 'draft'),
+                _buildFilterChip('Em Progresso', 'in_progress'),
+                _buildFilterChip('Em Revisao', 'review'),
+                _buildFilterChip('Entregue', 'delivered'),
+                _buildFilterChip('Concluido', 'completed'),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: projectProvider.isLoading
+                ? const LoadingWidget(message: 'Carregando projetos...')
+                : projectProvider.projects.isEmpty
+                    ? EmptyState(
+                        icon: Icons.folder_off_outlined,
+                        title: 'Nenhum projeto encontrado',
+                        subtitle: auth.canManageProjects
+                            ? 'Crie seu primeiro projeto de video'
+                            : 'Voce ainda nao foi adicionado a nenhum projeto',
+                        actionLabel:
+                            auth.canManageProjects ? 'Criar Projeto' : null,
+                        onAction: auth.canManageProjects
+                            ? () => Navigator.pushNamed(
+                                context, '/projects/create')
+                            : null,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => projectProvider.loadProjects(
+                          status: _statusFilter,
+                        ),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: projectProvider.projects.length,
+                          itemBuilder: (context, index) {
+                            final project = projectProvider.projects[index];
+                            return ProjectCard(
+                              project: project,
+                              onTap: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  '/projects/detail',
+                                  arguments: project.id,
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
           ),
         ],
       ),
-      body: Consumer<ProjectProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading && provider.projects.isEmpty) {
-            return const LoadingWidget(message: 'Loading projects...');
-          }
+      floatingActionButton: auth.canManageProjects
+          ? FloatingActionButton.extended(
+              onPressed: () => Navigator.pushNamed(context, '/projects/create'),
+              icon: const Icon(Icons.add),
+              label: const Text('Novo Projeto'),
+            )
+          : null,
+    );
+  }
 
-          if (provider.errorMessage != null && provider.projects.isEmpty) {
-            return ErrorState(
-              message: provider.errorMessage!,
-              onRetry: () => provider.loadProjects(),
-            );
-          }
-
-          if (provider.projects.isEmpty) {
-            return EmptyState(
-              icon: Icons.folder_open_rounded,
-              title: 'No projects yet',
-              subtitle: 'Create your first project to get started',
-              actionLabel: 'Create Project',
-              onAction: () => Navigator.of(context).pushNamed('/create-project'),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () => provider.loadProjects(),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: provider.projects.length,
-              itemBuilder: (context, index) {
-                final project = provider.projects[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: ProjectCard(
-                    project: project,
-                    onTap: () {
-                      Navigator.of(context).pushNamed(
-                        '/project-detail',
-                        arguments: project.id,
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          );
+  Widget _buildFilterChip(String label, String? status) {
+    final isSelected = _statusFilter == status;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (selected) {
+          setState(() {
+            _statusFilter = selected ? status : null;
+          });
+          _applyFilter();
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.of(context).pushNamed('/create-project'),
-        child: const Icon(Icons.add),
+        selectedColor: AppTheme.primaryColor.withOpacity(0.15),
+        checkmarkColor: AppTheme.primaryColor,
       ),
     );
   }

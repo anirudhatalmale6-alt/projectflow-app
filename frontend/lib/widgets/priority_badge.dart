@@ -1,74 +1,52 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
-import '../models/task.dart';
 
 class PriorityBadge extends StatelessWidget {
-  final TaskPriority priority;
-  final bool compact;
+  final String priority;
 
-  const PriorityBadge({
-    super.key,
-    required this.priority,
-    this.compact = false,
-  });
-
-  Color get _color {
-    switch (priority) {
-      case TaskPriority.low:
-        return AppTheme.priorityLow;
-      case TaskPriority.medium:
-        return AppTheme.priorityMedium;
-      case TaskPriority.high:
-        return AppTheme.priorityHigh;
-      case TaskPriority.critical:
-        return AppTheme.priorityCritical;
-    }
-  }
-
-  IconData get _icon {
-    switch (priority) {
-      case TaskPriority.low:
-        return Icons.arrow_downward_rounded;
-      case TaskPriority.medium:
-        return Icons.remove_rounded;
-      case TaskPriority.high:
-        return Icons.arrow_upward_rounded;
-      case TaskPriority.critical:
-        return Icons.priority_high_rounded;
-    }
-  }
+  const PriorityBadge({super.key, required this.priority});
 
   @override
   Widget build(BuildContext context) {
-    if (compact) {
-      return Container(
-        width: 24,
-        height: 24,
-        decoration: BoxDecoration(
-          color: _color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Icon(_icon, size: 14, color: _color),
-      );
+    final color = AppTheme.getPriorityColor(priority);
+    final label = AppTheme.getPriorityLabel(priority);
+
+    IconData icon;
+    switch (priority) {
+      case 'urgent':
+        icon = Icons.keyboard_double_arrow_up;
+        break;
+      case 'high':
+        icon = Icons.keyboard_arrow_up;
+        break;
+      case 'medium':
+        icon = Icons.remove;
+        break;
+      case 'low':
+        icon = Icons.keyboard_arrow_down;
+        break;
+      default:
+        icon = Icons.remove;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _color.withOpacity(0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_icon, size: 12, color: _color),
+          Icon(icon, size: 14, color: color),
           const SizedBox(width: 4),
           Text(
-            priority.label,
+            label,
             style: TextStyle(
+              color: color,
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: _color,
+              fontFamily: 'Poppins',
             ),
           ),
         ],

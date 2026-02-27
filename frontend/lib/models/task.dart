@@ -1,151 +1,122 @@
-import 'user.dart';
-
-enum TaskStatus {
-  todo('todo', 'To Do'),
-  inProgress('in_progress', 'In Progress'),
-  review('review', 'Review'),
-  done('done', 'Done');
-
-  final String value;
-  final String label;
-  const TaskStatus(this.value, this.label);
-
-  static TaskStatus fromString(String value) {
-    return TaskStatus.values.firstWhere(
-      (s) => s.value == value,
-      orElse: () => TaskStatus.todo,
-    );
-  }
-}
-
-enum TaskPriority {
-  low('low', 'Low'),
-  medium('medium', 'Medium'),
-  high('high', 'High'),
-  critical('critical', 'Critical');
-
-  final String value;
-  final String label;
-  const TaskPriority(this.value, this.label);
-
-  static TaskPriority fromString(String value) {
-    return TaskPriority.values.firstWhere(
-      (p) => p.value == value,
-      orElse: () => TaskPriority.medium,
-    );
-  }
-}
-
 class Task {
   final String id;
-  final String title;
-  final String description;
-  final TaskStatus status;
-  final TaskPriority priority;
   final String projectId;
-  final User? assignee;
-  final User? creator;
+  final String title;
+  final String? description;
+  final String status;
+  final String priority;
+  final String? assigneeId;
+  final String? assigneeName;
   final DateTime? dueDate;
+  final double? estimatedHours;
+  final double? actualHours;
   final List<String> tags;
-  final int commentCount;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final int position;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   Task({
     required this.id,
-    required this.title,
-    required this.description,
-    required this.status,
-    required this.priority,
     required this.projectId,
-    this.assignee,
-    this.creator,
+    required this.title,
+    this.description,
+    this.status = 'todo',
+    this.priority = 'medium',
+    this.assigneeId,
+    this.assigneeName,
     this.dueDate,
+    this.estimatedHours,
+    this.actualHours,
     this.tags = const [],
-    this.commentCount = 0,
-    required this.createdAt,
-    required this.updatedAt,
+    this.position = 0,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
     return Task(
-      id: json['_id'] ?? json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
+      projectId: json['project_id']?.toString() ?? '',
       title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      status: TaskStatus.fromString(json['status'] ?? 'todo'),
-      priority: TaskPriority.fromString(json['priority'] ?? 'medium'),
-      projectId: json['project'] is Map<String, dynamic>
-          ? json['project']['_id'] ?? ''
-          : json['project']?.toString() ?? '',
-      assignee: json['assignee'] is Map<String, dynamic>
-          ? User.fromJson(json['assignee'])
+      description: json['description'],
+      status: json['status'] ?? 'todo',
+      priority: json['priority'] ?? 'medium',
+      assigneeId: json['assignee_id']?.toString(),
+      assigneeName: json['assignee_name'],
+      dueDate:
+          json['due_date'] != null ? DateTime.tryParse(json['due_date']) : null,
+      estimatedHours: json['estimated_hours'] != null
+          ? double.tryParse(json['estimated_hours'].toString())
           : null,
-      creator: json['creator'] is Map<String, dynamic>
-          ? User.fromJson(json['creator'])
+      actualHours: json['actual_hours'] != null
+          ? double.tryParse(json['actual_hours'].toString())
           : null,
-      dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
-      tags: json['tags'] != null
-          ? List<String>.from(json['tags'])
-          : [],
-      commentCount: json['commentCount'] ?? 0,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
-          : DateTime.now(),
+      tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
+      position: json['position'] ?? 0,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'])
+          : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'])
+          : null,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'project_id': projectId,
       'title': title,
-      'description': description,
-      'status': status.value,
-      'priority': priority.value,
-      'assignee': assignee?.id,
-      'dueDate': dueDate?.toIso8601String(),
+      if (description != null) 'description': description,
+      'status': status,
+      'priority': priority,
+      if (assigneeId != null) 'assignee_id': assigneeId,
+      if (dueDate != null) 'due_date': dueDate!.toIso8601String(),
+      if (estimatedHours != null) 'estimated_hours': estimatedHours,
+      if (actualHours != null) 'actual_hours': actualHours,
       'tags': tags,
+      'position': position,
     };
   }
 
-  bool get isOverdue {
-    if (dueDate == null) return false;
-    if (status == TaskStatus.done) return false;
-    return dueDate!.isBefore(DateTime.now());
-  }
+  bool get isOverdue =>
+      dueDate != null && dueDate!.isBefore(DateTime.now()) && status != 'done';
 
-  bool get isDueSoon {
-    if (dueDate == null) return false;
-    if (status == TaskStatus.done) return false;
-    final diff = dueDate!.difference(DateTime.now()).inDays;
-    return diff >= 0 && diff <= 2;
+  double get hoursProgress {
+    if (estimatedHours == null || estimatedHours == 0) return 0;
+    return (actualHours ?? 0) / estimatedHours!;
   }
 
   Task copyWith({
+    String? id,
+    String? projectId,
     String? title,
     String? description,
-    TaskStatus? status,
-    TaskPriority? priority,
-    User? assignee,
+    String? status,
+    String? priority,
+    String? assigneeId,
+    String? assigneeName,
     DateTime? dueDate,
+    double? estimatedHours,
+    double? actualHours,
     List<String>? tags,
-    int? commentCount,
+    int? position,
   }) {
     return Task(
-      id: id,
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
       title: title ?? this.title,
       description: description ?? this.description,
       status: status ?? this.status,
       priority: priority ?? this.priority,
-      projectId: projectId,
-      assignee: assignee ?? this.assignee,
-      creator: creator,
+      assigneeId: assigneeId ?? this.assigneeId,
+      assigneeName: assigneeName ?? this.assigneeName,
       dueDate: dueDate ?? this.dueDate,
+      estimatedHours: estimatedHours ?? this.estimatedHours,
+      actualHours: actualHours ?? this.actualHours,
       tags: tags ?? this.tags,
-      commentCount: commentCount ?? this.commentCount,
+      position: position ?? this.position,
       createdAt: createdAt,
-      updatedAt: DateTime.now(),
+      updatedAt: updatedAt,
     );
   }
 }

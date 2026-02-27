@@ -1,224 +1,176 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/task.dart';
 import '../services/task_service.dart';
-import '../services/socket_service.dart';
+import '../services/api_service.dart';
 
-class TaskProvider extends ChangeNotifier {
+class TaskProvider with ChangeNotifier {
   final TaskService _taskService = TaskService();
-  final SocketService _socketService = SocketService();
 
   List<Task> _tasks = [];
-  List<Task> _myTasks = [];
-  Task? _selectedTask;
+  Task? _currentTask;
   bool _isLoading = false;
   String? _errorMessage;
-  String? _currentProjectId;
 
   List<Task> get tasks => _tasks;
-  List<Task> get myTasks => _myTasks;
-  Task? get selectedTask => _selectedTask;
+  Task? get currentTask => _currentTask;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  // Kanban board columns
-  List<Task> get todoTasks =>
-      _tasks.where((t) => t.status == TaskStatus.todo).toList();
+  // Kanban columns
+  List<Task> get todoTasks => _tasks.where((t) => t.status == 'todo').toList()
+    ..sort((a, b) => a.position.compareTo(b.position));
   List<Task> get inProgressTasks =>
-      _tasks.where((t) => t.status == TaskStatus.inProgress).toList();
+      _tasks.where((t) => t.status == 'in_progress').toList()
+        ..sort((a, b) => a.position.compareTo(b.position));
   List<Task> get reviewTasks =>
-      _tasks.where((t) => t.status == TaskStatus.review).toList();
-  List<Task> get doneTasks =>
-      _tasks.where((t) => t.status == TaskStatus.done).toList();
+      _tasks.where((t) => t.status == 'review').toList()
+        ..sort((a, b) => a.position.compareTo(b.position));
+  List<Task> get doneTasks => _tasks.where((t) => t.status == 'done').toList()
+    ..sort((a, b) => a.position.compareTo(b.position));
 
-  TaskProvider() {
-    _setupSocketListeners();
-  }
-
-  void _setupSocketListeners() {
-    _socketService.on('task:created', (data) {
-      if (data is Map<String, dynamic>) {
-        final task = Task.fromJson(data);
-        if (task.projectId == _currentProjectId) {
-          _tasks.add(task);
-          notifyListeners();
-        }
-      }
-    });
-
-    _socketService.on('task:updated', (data) {
-      if (data is Map<String, dynamic>) {
-        final updated = Task.fromJson(data);
-        _updateTaskInList(updated);
-      }
-    });
-
-    _socketService.on('task:statusChanged', (data) {
-      if (data is Map<String, dynamic>) {
-        final updated = Task.fromJson(data);
-        _updateTaskInList(updated);
-      }
-    });
-
-    _socketService.on('task:deleted', (data) {
-      if (data is Map<String, dynamic>) {
-        final taskId = data['_id'] ?? data['id'];
-        if (taskId != null) {
-          _tasks.removeWhere((t) => t.id == taskId);
-          if (_selectedTask?.id == taskId) {
-            _selectedTask = null;
-          }
-          notifyListeners();
-        }
-      }
-    });
-  }
-
-  void _updateTaskInList(Task updated) {
-    final index = _tasks.indexWhere((t) => t.id == updated.id);
-    if (index != -1) {
-      _tasks[index] = updated;
-    }
-    if (_selectedTask?.id == updated.id) {
-      _selectedTask = updated;
-    }
-    // Also update in myTasks
-    final myIndex = _myTasks.indexWhere((t) => t.id == updated.id);
-    if (myIndex != -1) {
-      _myTasks[myIndex] = updated;
-    }
-    notifyListeners();
-  }
-
-  Future<void> loadTasks(String projectId) async {
+  Future<void> loadTasks({String? projectId, String? assigneeId}) async {
     _isLoading = true;
     _errorMessage = null;
-    _currentProjectId = projectId;
     notifyListeners();
 
     try {
-      _tasks = await _taskService.getTasks(projectId);
+      _tasks = await _taskService.getTasks(
+        projectId: projectId,
+        assigneeId: assigneeId,
+      );
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
     }
-
     _isLoading = false;
     notifyListeners();
   }
 
-  Future<void> loadTask(String projectId, String taskId) async {
+  Future<void> loadTask(String id) async {
     _isLoading = true;
-    _errorMessage = null;
     notifyListeners();
 
     try {
-      _selectedTask = await _taskService.getTask(projectId, taskId);
+      _currentTask = await _taskService.getTask(id);
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
     }
-
     _isLoading = false;
     notifyListeners();
   }
 
-  Future<Task?> createTask(String projectId, Map<String, dynamic> data) async {
+  Future<Task?> createTask(Map<String, dynamic> data) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final task = await _taskService.createTask(projectId, data);
+      final task = await _taskService.createTask(data);
       _tasks.add(task);
       _isLoading = false;
       notifyListeners();
       return task;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
       _isLoading = false;
       notifyListeners();
       return null;
     }
   }
 
-  Future<bool> updateTask(
-      String projectId, String taskId, Map<String, dynamic> data) async {
+  Future<bool> updateTask(String id, Map<String, dynamic> data) async {
     try {
-      final updated = await _taskService.updateTask(projectId, taskId, data);
-      _updateTaskInList(updated);
+      final updated = await _taskService.updateTask(id, data);
+      final index = _tasks.indexWhere((t) => t.id == id);
+      if (index >= 0) _tasks[index] = updated;
+      if (_currentTask?.id == id) _currentTask = updated;
+      notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
       notifyListeners();
       return false;
     }
   }
 
-  Future<bool> updateTaskStatus(
-      String projectId, String taskId, TaskStatus newStatus) async {
+  Future<bool> deleteTask(String id) async {
+    try {
+      await _taskService.deleteTask(id);
+      _tasks.removeWhere((t) => t.id == id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> moveTask(String taskId, String newStatus, int newPosition) async {
     // Optimistic update
     final index = _tasks.indexWhere((t) => t.id == taskId);
-    Task? oldTask;
-    if (index != -1) {
-      oldTask = _tasks[index];
-      _tasks[index] = oldTask.copyWith(status: newStatus);
-      notifyListeners();
-    }
+    if (index < 0) return false;
+
+    final oldTask = _tasks[index];
+    _tasks[index] = oldTask.copyWith(status: newStatus, position: newPosition);
+    notifyListeners();
 
     try {
-      final updated =
-          await _taskService.updateTaskStatus(projectId, taskId, newStatus.value);
-      _updateTaskInList(updated);
+      await _taskService.updatePosition(taskId, newPosition, status: newStatus);
       return true;
     } catch (e) {
-      // Rollback on error
-      if (oldTask != null && index != -1) {
-        _tasks[index] = oldTask;
-        notifyListeners();
-      }
-      _errorMessage = e.toString();
+      // Rollback
+      _tasks[index] = oldTask;
+      _errorMessage = _parseError(e);
       notifyListeners();
       return false;
     }
   }
 
-  Future<bool> deleteTask(String projectId, String taskId) async {
+  Future<bool> updateTaskStatus(String taskId, String status) async {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index < 0) return false;
+
+    final oldTask = _tasks[index];
+    _tasks[index] = oldTask.copyWith(status: status);
+    notifyListeners();
+
     try {
-      await _taskService.deleteTask(projectId, taskId);
-      _tasks.removeWhere((t) => t.id == taskId);
-      if (_selectedTask?.id == taskId) {
-        _selectedTask = null;
-      }
-      notifyListeners();
+      await _taskService.updateStatus(taskId, status);
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _tasks[index] = oldTask;
+      _errorMessage = _parseError(e);
       notifyListeners();
       return false;
     }
   }
 
-  Future<void> loadMyTasks({String? status}) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
+  Future<bool> updateHours(String taskId, double hours) async {
     try {
-      _myTasks = await _taskService.getMyTasks(status: status);
+      await _taskService.updateHours(taskId, hours);
+      final index = _tasks.indexWhere((t) => t.id == taskId);
+      if (index >= 0) {
+        _tasks[index] = _tasks[index].copyWith(actualHours: hours);
+      }
+      if (_currentTask?.id == taskId) {
+        _currentTask = _currentTask!.copyWith(actualHours: hours);
+      }
+      notifyListeners();
+      return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = _parseError(e);
+      notifyListeners();
+      return false;
     }
-
-    _isLoading = false;
-    notifyListeners();
-  }
-
-  void clearTasks() {
-    _tasks = [];
-    _currentProjectId = null;
-    notifyListeners();
   }
 
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  String _parseError(dynamic error) {
+    if (error is ApiException) return error.message;
+    return 'Ocorreu um erro. Tente novamente.';
   }
 }

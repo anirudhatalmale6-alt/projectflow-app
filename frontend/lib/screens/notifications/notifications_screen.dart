@@ -22,121 +22,68 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
   }
 
-  void _navigateToNotification(dynamic notification) {
+  void _handleNotificationTap(notification) {
     // Mark as read
-    if (!notification.isRead) {
-      context.read<NotificationProvider>().markAsRead(notification.id);
-    }
+    context.read<NotificationProvider>().markAsRead(notification.id);
 
-    // Navigate based on type
-    if (notification.taskId != null && notification.projectId != null) {
-      Navigator.of(context).pushNamed(
-        '/task-detail',
-        arguments: {
-          'projectId': notification.projectId,
-          'taskId': notification.taskId,
-        },
-      );
-    } else if (notification.projectId != null) {
-      Navigator.of(context).pushNamed(
-        '/project-detail',
-        arguments: notification.projectId,
-      );
+    // Navigate based on reference type
+    if (notification.referenceType != null &&
+        notification.referenceId != null) {
+      switch (notification.referenceType) {
+        case 'project':
+          Navigator.pushNamed(context, '/projects/detail',
+              arguments: notification.referenceId);
+          break;
+        case 'task':
+          Navigator.pushNamed(context, '/tasks/detail',
+              arguments: notification.referenceId);
+          break;
+        case 'delivery':
+          Navigator.pushNamed(context, '/deliveries/detail',
+              arguments: notification.referenceId);
+          break;
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<NotificationProvider>();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: const Text('Notificacoes'),
         actions: [
-          Consumer<NotificationProvider>(
-            builder: (context, provider, _) {
-              if (provider.unreadCount > 0) {
-                return TextButton(
-                  onPressed: () => provider.markAllAsRead(),
-                  child: const Text('Mark all read'),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
+          if (provider.unreadCount > 0)
+            TextButton.icon(
+              onPressed: () => provider.markAllAsRead(),
+              icon: const Icon(Icons.done_all, size: 18),
+              label: const Text('Marcar todas'),
+            ),
         ],
       ),
-      body: Consumer<NotificationProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading && provider.notifications.isEmpty) {
-            return const LoadingWidget(message: 'Loading notifications...');
-          }
-
-          if (provider.errorMessage != null && provider.notifications.isEmpty) {
-            return ErrorState(
-              message: provider.errorMessage!,
-              onRetry: () => provider.loadNotifications(),
-            );
-          }
-
-          if (provider.notifications.isEmpty) {
-            return const EmptyState(
-              icon: Icons.notifications_off_outlined,
-              title: 'No notifications',
-              subtitle: 'You\'re all caught up! Notifications will appear here.',
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () => provider.loadNotifications(),
-            child: Column(
-              children: [
-                // Unread count header
-                if (provider.unreadCount > 0)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    color: AppTheme.primaryColor.withOpacity(0.05),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.primaryColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${provider.unreadCount} unread notification${provider.unreadCount != 1 ? 's' : ''}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.primaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Notification list
-                Expanded(
+      body: provider.isLoading
+          ? const LoadingWidget(message: 'Carregando notificacoes...')
+          : provider.notifications.isEmpty
+              ? const EmptyState(
+                  icon: Icons.notifications_off_outlined,
+                  title: 'Sem notificacoes',
+                  subtitle: 'Voce sera notificado sobre atualizacoes nos seus projetos',
+                )
+              : RefreshIndicator(
+                  onRefresh: () => provider.loadNotifications(),
                   child: ListView.builder(
                     itemCount: provider.notifications.length,
                     itemBuilder: (context, index) {
                       final notification = provider.notifications[index];
                       return NotificationTile(
                         notification: notification,
-                        onTap: () => _navigateToNotification(notification),
+                        onTap: () =>
+                            _handleNotificationTap(notification),
                       );
                     },
                   ),
                 ),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 }

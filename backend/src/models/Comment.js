@@ -1,24 +1,36 @@
 const pool = require('../config/database');
 
 const Comment = {
-  async create({ taskId, userId, content }) {
+  /**
+   * Create a polymorphic comment.
+   * @param {object} params
+   * @param {string} params.entityType - 'project', 'task', or 'delivery'
+   * @param {string} params.entityId   - UUID of the entity
+   * @param {string} params.userId     - UUID of the user
+   * @param {string} params.content    - Comment text
+   */
+  async create({ entityType, entityId, userId, content }) {
     const { rows } = await pool.query(
-      `INSERT INTO comments (task_id, user_id, content)
-       VALUES ($1, $2, $3)
+      `INSERT INTO comments (entity_type, entity_id, user_id, content)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [taskId, userId, content]
+      [entityType, entityId, userId, content]
     );
     return rows[0];
   },
 
-  async findByTaskId(taskId) {
+  /**
+   * Find comments for an entity (polymorphic).
+   */
+  async findByEntity(entityType, entityId, { limit = 100, offset = 0 } = {}) {
     const { rows } = await pool.query(
       `SELECT c.*, u.name AS user_name, u.email AS user_email, u.avatar_url AS user_avatar
        FROM comments c
        JOIN users u ON c.user_id = u.id
-       WHERE c.task_id = $1
-       ORDER BY c.created_at ASC`,
-      [taskId]
+       WHERE c.entity_type = $1 AND c.entity_id = $2
+       ORDER BY c.created_at ASC
+       LIMIT $3 OFFSET $4`,
+      [entityType, entityId, limit, offset]
     );
     return rows;
   },
@@ -34,26 +46,12 @@ const Comment = {
     return rows[0] || null;
   },
 
-  async addMentions(commentId, userIds) {
-    if (!userIds || userIds.length === 0) return [];
-    const values = userIds.map((uid, i) => `($1, $${i + 2})`).join(', ');
-    const params = [commentId, ...userIds];
+  async countByEntity(entityType, entityId) {
     const { rows } = await pool.query(
-      `INSERT INTO mentions (comment_id, mentioned_user_id) VALUES ${values} RETURNING *`,
-      params
+      `SELECT COUNT(*)::int AS count FROM comments WHERE entity_type = $1 AND entity_id = $2`,
+      [entityType, entityId]
     );
-    return rows;
-  },
-
-  async getMentions(commentId) {
-    const { rows } = await pool.query(
-      `SELECT m.*, u.name AS user_name, u.email AS user_email
-       FROM mentions m
-       JOIN users u ON m.mentioned_user_id = u.id
-       WHERE m.comment_id = $1`,
-      [commentId]
-    );
-    return rows;
+    return rows[0].count;
   },
 };
 

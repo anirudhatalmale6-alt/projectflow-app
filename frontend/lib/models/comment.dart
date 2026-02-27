@@ -1,52 +1,53 @@
-import 'user.dart';
-
 class Comment {
   final String id;
+  final String entityType;
+  final String entityId;
+  final String? userId;
+  final String? userName;
+  final String? userAvatarUrl;
   final String content;
-  final String taskId;
-  final User? author;
-  final List<String> mentions;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? createdAt;
 
   Comment({
     required this.id,
+    required this.entityType,
+    required this.entityId,
+    this.userId,
+    this.userName,
+    this.userAvatarUrl,
     required this.content,
-    required this.taskId,
-    this.author,
-    this.mentions = const [],
-    required this.createdAt,
-    required this.updatedAt,
+    this.createdAt,
   });
 
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
-      id: json['_id'] ?? json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
+      entityType: json['entity_type'] ?? '',
+      entityId: json['entity_id']?.toString() ?? '',
+      userId: json['user_id']?.toString(),
+      userName: json['user_name'],
+      userAvatarUrl: json['user_avatar_url'],
       content: json['content'] ?? '',
-      taskId: json['task'] is Map<String, dynamic>
-          ? json['task']['_id'] ?? ''
-          : json['task']?.toString() ?? '',
-      author: json['author'] is Map<String, dynamic>
-          ? User.fromJson(json['author'])
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'])
           : null,
-      mentions: json['mentions'] != null
-          ? List<String>.from(json['mentions'])
-          : [],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
-          : DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'entity_type': entityType,
+      'entity_id': entityId,
       'content': content,
-      'mentions': mentions,
     };
   }
 
-  bool get isEdited => updatedAt.isAfter(createdAt.add(const Duration(seconds: 1)));
+  String get userInitials {
+    if (userName == null || userName!.isEmpty) return '?';
+    final parts = userName!.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return userName![0].toUpperCase();
+  }
 }

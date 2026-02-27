@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,17 +32,16 @@ jobs:
         working-directory: frontend
         run: flutter build apk --release
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.0-demo
-          name: Duozz Flow v1.0 Demo
-          files: frontend/build/app/outputs/flutter-apk/app-release.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: duozzflow-apk
           path: frontend/build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: v1.0.0-demo
+          name: Duozz Flow v1.0 Demo
+          files: frontend/build/app/outputs/flutter-apk/app-release.apk

@@ -48274,7 +48274,7 @@ q.n(0,"Accept",r)
 s=this.a
 if(s!=null)q.n(0,"Authorization","Bearer "+s)
 return q},
-Gv(a,b){var s=A.jl("http://localhost:3000"+a)
+Gv(a,b){var s=A.jl("http://167.235.196.123:3000"+a)
 if(b!=null&&b.a!==0)return s.a10(0,b)
 return s},
 kA(a){return this.Gv(a,null)},

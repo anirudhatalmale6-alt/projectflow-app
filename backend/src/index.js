@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
+const compression = require('compression');
 
 const errorHandler = require('./middleware/errorHandler');
 const setupSocket = require('./socket');
@@ -50,12 +51,18 @@ app.set('io', io);
 // Setup Socket.IO event handlers
 setupSocket(io);
 
+// Gzip compression for faster loading
+app.use(compression());
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Security headers
-app.use(helmet());
+// Security headers (relaxed for Flutter web)
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
 
 // Prevent HTTP Parameter Pollution
 app.use(hpp());
@@ -63,7 +70,7 @@ app.use(hpp());
 // Rate limiting - general
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 500,
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -143,9 +150,17 @@ app.use('/api/v1/admin', adminRoutes);
 
 // =============================================================
 
-// 404 handler for unknown routes
-app.use((req, res) => {
-  res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
+// Serve Flutter web frontend
+const path = require('path');
+const publicDir = path.join(__dirname, '..', 'public');
+app.use(express.static(publicDir));
+
+// SPA fallback - serve index.html for non-API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
+  }
+  res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 // Global error handler
@@ -154,7 +169,7 @@ app.use(errorHandler);
 // Start server
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Duozz Flow API running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`CORS origin: ${corsOptions.origin}`);

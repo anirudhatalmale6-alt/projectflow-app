@@ -1,7 +1,25 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 class ApiConfig {
-  static const String baseUrl = 'http://localhost:3000';
+  static String get baseUrl {
+    if (kIsWeb) {
+      // On web, use the current page origin (same-origin requests)
+      final origin = Uri.base.origin;
+      return origin;
+    }
+    // Mobile fallback
+    return 'http://167.235.196.123:3000';
+  }
+
   static const String apiPrefix = '/api/v1';
-  static const String wsUrl = 'ws://localhost:3000';
+
+  static String get wsUrl {
+    if (kIsWeb) {
+      final origin = Uri.base.origin;
+      return origin.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
+    }
+    return 'ws://167.235.196.123:3000';
+  }
 
   // Auth
   static const String login = '$apiPrefix/auth/login';

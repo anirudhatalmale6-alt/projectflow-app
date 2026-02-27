@@ -46,49 +46,15 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 60),
-              // DUOZZ Logo - subtle
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppTheme.textPrimary,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
-                      size: 28,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  RichText(
-                    text: const TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Duozz ',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textPrimary,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                        TextSpan(
-                          text: 'Flow',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w300,
-                            color: AppTheme.textSecondary,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 48),
+              // Real DUOZZ Logo
+              Center(
+                child: Image.asset(
+                  'assets/images/logo_orange.png',
+                  width: 140,
+                  height: 90,
+                  fit: BoxFit.contain,
+                ),
               ),
               const SizedBox(height: 32),
               const Text(

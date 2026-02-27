@@ -77,68 +77,44 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // DUOZZ star icon
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        size: 48,
+                    // Real DUOZZ logo (stamp version on dark bg)
+                    Image.asset(
+                      'assets/images/logo_stamp.png',
+                      width: 200,
+                      height: 140,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(height: 24),
+                    // Flow subtitle
+                    const Text(
+                      'FLOW',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w300,
                         color: Colors.white,
+                        fontFamily: 'Poppins',
+                        letterSpacing: 10,
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    // Duozz Flow title
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: const TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Duozz ',
-                            style: TextStyle(
-                              fontSize: 44,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.primaryColor,
-                              fontFamily: 'Poppins',
-                              letterSpacing: 2,
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'Flow',
-                            style: TextStyle(
-                              fontSize: 44,
-                              fontWeight: FontWeight.w300,
-                              color: Colors.white,
-                              fontFamily: 'Poppins',
-                              letterSpacing: 2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     Text(
                       'É pra ontem!',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontStyle: FontStyle.italic,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withOpacity(0.5),
                         fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w400,
                         letterSpacing: 1,
                       ),
                     ),
                     const SizedBox(height: 48),
                     SizedBox(
-                      width: 28,
-                      height: 28,
+                      width: 24,
+                      height: 24,
                       child: CircularProgressIndicator(
-                        color: AppTheme.primaryColor,
-                        strokeWidth: 2.5,
+                        color: Colors.white.withOpacity(0.4),
+                        strokeWidth: 2,
                       ),
                     ),
                   ],

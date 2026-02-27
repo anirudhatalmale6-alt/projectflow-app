@@ -63,7 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         CircleAvatar(
                           radius: 24,
-                          backgroundColor: Colors.white.withOpacity(0.2),
+                          backgroundColor: Colors.white.withOpacity(0.12),
                           child: Text(
                             user?.initials ?? 'U',
                             style: const TextStyle(
@@ -82,7 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 _getGreeting(),
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.white.withOpacity(0.8),
+                                  color: Colors.white.withOpacity(0.6),
                                   fontFamily: 'Poppins',
                                 ),
                               ),
@@ -102,7 +102,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: AppTheme.primaryColor.withOpacity(0.8),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -126,19 +126,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           'Projetos',
                           Icons.folder_outlined,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         _buildQuickStat(
                           '${tasks.tasks.length}',
                           'Tarefas',
                           Icons.task_outlined,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         _buildQuickStat(
                           '${tasks.inProgressTasks.length}',
-                          'Em Progresso',
+                          'Ativas',
                           Icons.play_circle_outline,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         _buildQuickStat(
                           '${notifs.unreadCount}',
                           'Avisos',
@@ -208,7 +208,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             'Projetos Ativos',
                             '${projects.projects.where((p) => p.status == 'in_progress').length}',
                             Icons.movie_creation_outlined,
-                            AppTheme.primaryColor,
+                            AppTheme.infoColor,
                           ),
                         ),
                       ],

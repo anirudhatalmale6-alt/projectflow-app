@@ -173,8 +173,8 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
           });
           _applyFilter();
         },
-        selectedColor: AppTheme.primaryColor.withOpacity(0.15),
-        checkmarkColor: AppTheme.primaryColor,
+        selectedColor: AppTheme.textPrimary.withOpacity(0.1),
+        checkmarkColor: AppTheme.textPrimary,
       ),
     );
   }

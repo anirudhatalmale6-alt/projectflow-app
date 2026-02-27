@@ -183,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppTheme.primaryColor.withOpacity(0.1)
+              ? AppTheme.textPrimary.withOpacity(0.08)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
@@ -193,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(
               isSelected ? item.activeIcon : item.icon,
               size: 22,
-              color: isSelected ? AppTheme.primaryColor : AppTheme.textTertiary,
+              color: isSelected ? AppTheme.textPrimary : AppTheme.textTertiary,
             ),
             if (isSelected) ...[
               const SizedBox(width: 6),
@@ -202,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.primaryColor,
+                  color: AppTheme.textPrimary,
                   fontFamily: 'Poppins',
                 ),
               ),

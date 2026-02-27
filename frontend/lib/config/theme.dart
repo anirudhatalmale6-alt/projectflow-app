@@ -19,7 +19,7 @@ class AppTheme {
 
   // Status Colors
   static const Color statusDraft = Color(0xFF9E9892);
-  static const Color statusInProgress = Color(0xFFE8490E); // DUOZZ Orange
+  static const Color statusInProgress = Color(0xFF2563EB); // Blue - active
   static const Color statusReview = Color(0xFFF59E0B);
   static const Color statusDelivered = Color(0xFF6B6560);
   static const Color statusCompleted = Color(0xFF16A34A);
@@ -34,11 +34,11 @@ class AppTheme {
   static const Color priorityHigh = Color(0xFFE8490E);
   static const Color priorityUrgent = Color(0xFFDC2626);
 
-  // Gradient - DUOZZ style (orange to dark)
+  // Gradient - DUOZZ style (dark charcoal, elegant)
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFE8490E), Color(0xFFC43A08)],
+    colors: [Color(0xFF2D2926), Color(0xFF1A1A1A)],
   );
 
   static const LinearGradient splashGradient = LinearGradient(
@@ -85,7 +85,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
+          backgroundColor: textPrimary,
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -101,8 +101,8 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: primaryColor,
-          side: const BorderSide(color: primaryColor),
+          foregroundColor: textPrimary,
+          side: const BorderSide(color: textPrimary),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -116,7 +116,7 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: primaryColor,
+          foregroundColor: secondaryColor,
           textStyle: const TextStyle(
             fontFamily: 'Poppins',
             fontSize: 14,
@@ -138,7 +138,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryColor, width: 2),
+          borderSide: const BorderSide(color: textPrimary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -155,7 +155,7 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
-        selectedItemColor: primaryColor,
+        selectedItemColor: textPrimary,
         unselectedItemColor: textTertiary,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
@@ -183,7 +183,7 @@ class AppTheme {
         side: const BorderSide(color: dividerColor),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: primaryColor,
+        backgroundColor: textPrimary,
         foregroundColor: Colors.white,
         elevation: 4,
       ),
@@ -192,9 +192,9 @@ class AppTheme {
         thickness: 1,
       ),
       tabBarTheme: const TabBarTheme(
-        labelColor: primaryColor,
+        labelColor: textPrimary,
         unselectedLabelColor: textSecondary,
-        indicatorColor: primaryColor,
+        indicatorColor: textPrimary,
         labelStyle: TextStyle(
           fontFamily: 'Poppins',
           fontSize: 14,

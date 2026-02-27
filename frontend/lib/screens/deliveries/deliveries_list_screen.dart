@@ -117,7 +117,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
                       arguments: widget.projectId),
                   icon: const Icon(Icons.upload_file),
                   label: const Text('Nova Entrega'),
-                  backgroundColor: AppTheme.secondaryColor,
+                  backgroundColor: AppTheme.textPrimary,
                 )
               : null,
     );
@@ -134,8 +134,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
           setState(() => _statusFilter = selected ? status : null);
           _applyFilter();
         },
-        selectedColor: AppTheme.secondaryColor.withOpacity(0.15),
-        checkmarkColor: AppTheme.secondaryColor,
+        selectedColor: AppTheme.textPrimary.withOpacity(0.1),
+        checkmarkColor: AppTheme.textPrimary,
       ),
     );
   }

@@ -52,7 +52,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
                     _isKanbanView ? Icons.view_list : Icons.view_column,
                   ),
                   tooltip:
-                      _isKanbanView ? 'Visualizacao em lista' : 'Kanban',
+                      _isKanbanView ? 'Visualização em lista' : 'Kanban',
                   onPressed: () {
                     setState(() => _isKanbanView = !_isKanbanView);
                   },
@@ -65,7 +65,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
               ? EmptyState(
                   icon: Icons.task_outlined,
                   title: 'Nenhuma tarefa',
-                  subtitle: 'As tarefas aparecerao aqui',
+                  subtitle: 'As tarefas aparecerão aqui',
                   actionLabel:
                       auth.canAssignTasks ? 'Criar Tarefa' : null,
                   onAction: auth.canAssignTasks
@@ -106,13 +106,13 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
             AppTheme.statusInProgress,
           ),
           _buildKanbanColumn(
-            'Revisao',
+            'Revisão',
             'review',
             provider.reviewTasks,
             AppTheme.statusReview,
           ),
           _buildKanbanColumn(
-            'Concluido',
+            'Concluído',
             'done',
             provider.doneTasks,
             AppTheme.statusCompleted,

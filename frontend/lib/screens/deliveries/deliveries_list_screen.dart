@@ -58,7 +58,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
               children: [
                 _buildFilterChip('Todos', null),
                 _buildFilterChip('Pendente', 'pending'),
-                _buildFilterChip('Em Revisao', 'in_review'),
+                _buildFilterChip('Em Revisão', 'in_review'),
                 _buildFilterChip('Aprovado', 'approved'),
                 _buildFilterChip('Rejeitado', 'rejected'),
               ],
@@ -72,7 +72,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
                     ? EmptyState(
                         icon: Icons.video_file_outlined,
                         title: 'Nenhuma entrega',
-                        subtitle: 'Entregas de video aparecerao aqui',
+                        subtitle: 'Entregas de vídeo aparecerão aqui',
                         actionLabel: (auth.isEditor ||
                                 auth.isFreelancer ||
                                 auth.canManageProjects)

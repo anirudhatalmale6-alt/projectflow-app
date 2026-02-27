@@ -236,11 +236,11 @@ class AppTheme {
       case 'in_progress':
         return 'Em Progresso';
       case 'review':
-        return 'Em Revisao';
+        return 'Em Revisão';
       case 'delivered':
         return 'Entregue';
       case 'completed':
-        return 'Concluido';
+        return 'Concluído';
       case 'archived':
         return 'Arquivado';
       default:
@@ -270,9 +270,9 @@ class AppTheme {
       case 'in_progress':
         return 'Em Progresso';
       case 'review':
-        return 'Revisao';
+        return 'Revisão';
       case 'done':
-        return 'Concluido';
+        return 'Concluído';
       default:
         return status;
     }
@@ -304,13 +304,13 @@ class AppTheme {
       case 'uploaded':
         return 'Enviado';
       case 'in_review':
-        return 'Em Revisao';
+        return 'Em Revisão';
       case 'approved':
         return 'Aprovado';
       case 'rejected':
         return 'Rejeitado';
       case 'revision_requested':
-        return 'Revisao Solicitada';
+        return 'Revisão Solicitada';
       default:
         return status;
     }
@@ -336,7 +336,7 @@ class AppTheme {
       case 'low':
         return 'Baixa';
       case 'medium':
-        return 'Media';
+        return 'Média';
       case 'high':
         return 'Alta';
       case 'urgent':

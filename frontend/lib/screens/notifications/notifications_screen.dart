@@ -52,7 +52,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notificacoes'),
+        title: const Text('Notificações'),
         actions: [
           if (provider.unreadCount > 0)
             TextButton.icon(
@@ -68,7 +68,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ? const EmptyState(
                   icon: Icons.notifications_off_outlined,
                   title: 'Sem notificacoes',
-                  subtitle: 'Voce sera notificado sobre atualizacoes nos seus projetos',
+                  subtitle: 'Você será notificado sobre atualizações nos seus projetos',
                 )
               : RefreshIndicator(
                   onRefresh: () => provider.loadNotifications(),

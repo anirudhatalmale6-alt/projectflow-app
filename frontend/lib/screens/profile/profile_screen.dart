@@ -31,7 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (user == null) {
       return const Scaffold(
-        body: Center(child: Text('Usuario nao encontrado')),
+        body: Center(child: Text('Usuário não encontrado')),
       );
     }
 
@@ -141,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildInfoCard(
                     icon: Icons.phone_outlined,
                     label: 'Telefone',
-                    value: user.phone ?? 'Nao informado',
+                    value: user.phone ?? 'Não informado',
                     isEditing: _isEditingPhone,
                     controller: _phoneController,
                     onEdit: () {
@@ -166,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Configuracoes',
+                      'Configurações',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -177,19 +177,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 12),
                   _buildSettingTile(
                     icon: Icons.notifications_outlined,
-                    title: 'Notificacoes',
-                    subtitle: 'Gerenciar preferencias de notificacao',
+                    title: 'Notificações',
+                    subtitle: 'Gerenciar preferências de notificação',
                     onTap: () {},
                   ),
                   _buildSettingTile(
                     icon: Icons.language,
                     title: 'Idioma',
-                    subtitle: 'Portugues (Brasil)',
+                    subtitle: 'Português (Brasil)',
                     onTap: () {},
                   ),
                   _buildSettingTile(
                     icon: Icons.dark_mode_outlined,
-                    title: 'Aparencia',
+                    title: 'Aparência',
                     subtitle: 'Tema claro',
                     onTap: () {},
                   ),

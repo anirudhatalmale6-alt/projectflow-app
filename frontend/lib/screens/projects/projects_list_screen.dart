@@ -101,9 +101,9 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                 _buildFilterChip('Todos', null),
                 _buildFilterChip('Rascunho', 'draft'),
                 _buildFilterChip('Em Progresso', 'in_progress'),
-                _buildFilterChip('Em Revisao', 'review'),
+                _buildFilterChip('Em Revisão', 'review'),
                 _buildFilterChip('Entregue', 'delivered'),
-                _buildFilterChip('Concluido', 'completed'),
+                _buildFilterChip('Concluído', 'completed'),
               ],
             ),
           ),
@@ -116,8 +116,8 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                         icon: Icons.folder_off_outlined,
                         title: 'Nenhum projeto encontrado',
                         subtitle: auth.canManageProjects
-                            ? 'Crie seu primeiro projeto de video'
-                            : 'Voce ainda nao foi adicionado a nenhum projeto',
+                            ? 'Crie seu primeiro projeto de vídeo'
+                            : 'Você ainda não foi adicionado a nenhum projeto',
                         actionLabel:
                             auth.canManageProjects ? 'Criar Projeto' : null,
                         onAction: auth.canManageProjects

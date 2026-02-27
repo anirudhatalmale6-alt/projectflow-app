@@ -215,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'Nao tem uma conta? ',
+                    'Não tem uma conta?',
                     style: TextStyle(
                       color: AppTheme.textSecondary,
                       fontSize: 14,

@@ -205,7 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       validator: (value) {
                         if (value != _passwordController.text) {
-                          return 'As senhas nao conferem';
+                          return 'As senhas não conferem';
                         }
                         return null;
                       },
@@ -243,7 +243,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'Ja tem uma conta? ',
+                    'Já tem uma conta?',
                     style: TextStyle(
                       color: AppTheme.textSecondary,
                       fontSize: 14,

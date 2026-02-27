@@ -3,13 +3,12 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../dashboard/dashboard_screen.dart';
 import '../projects/projects_list_screen.dart';
 import '../tasks/task_board_screen.dart';
 import '../deliveries/deliveries_list_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
-import '../clients/clients_list_screen.dart';
-import '../admin/admin_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Load notifications on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationProvider>().loadNotifications();
     });
@@ -34,14 +32,20 @@ class _HomeScreenState extends State<HomeScreen> {
     if (auth.isAdmin || auth.isManager) {
       return [
         _NavItem(
+          icon: Icons.space_dashboard_outlined,
+          activeIcon: Icons.space_dashboard,
+          label: 'Início',
+          screen: const DashboardScreen(),
+        ),
+        _NavItem(
           icon: Icons.folder_outlined,
           activeIcon: Icons.folder,
           label: 'Projetos',
           screen: const ProjectsListScreen(),
         ),
         _NavItem(
-          icon: Icons.task_outlined,
-          activeIcon: Icons.task,
+          icon: Icons.view_kanban_outlined,
+          activeIcon: Icons.view_kanban,
           label: 'Tarefas',
           screen: const TaskBoardScreen(),
         ),
@@ -50,12 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
           activeIcon: Icons.video_file,
           label: 'Entregas',
           screen: const DeliveriesListScreen(),
-        ),
-        _NavItem(
-          icon: Icons.notifications_outlined,
-          activeIcon: Icons.notifications,
-          label: 'Avisos',
-          screen: const NotificationsScreen(),
         ),
         _NavItem(
           icon: Icons.person_outlined,
@@ -67,15 +65,21 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (auth.isEditor || auth.isFreelancer) {
       return [
         _NavItem(
+          icon: Icons.space_dashboard_outlined,
+          activeIcon: Icons.space_dashboard,
+          label: 'Início',
+          screen: const DashboardScreen(),
+        ),
+        _NavItem(
           icon: Icons.folder_outlined,
           activeIcon: Icons.folder,
-          label: 'Meus Projetos',
+          label: 'Projetos',
           screen: const ProjectsListScreen(),
         ),
         _NavItem(
-          icon: Icons.task_outlined,
-          activeIcon: Icons.task,
-          label: 'Minhas Tarefas',
+          icon: Icons.view_kanban_outlined,
+          activeIcon: Icons.view_kanban,
+          label: 'Tarefas',
           screen: const TaskBoardScreen(),
         ),
         _NavItem(
@@ -83,12 +87,6 @@ class _HomeScreenState extends State<HomeScreen> {
           activeIcon: Icons.video_file,
           label: 'Entregas',
           screen: const DeliveriesListScreen(),
-        ),
-        _NavItem(
-          icon: Icons.notifications_outlined,
-          activeIcon: Icons.notifications,
-          label: 'Avisos',
-          screen: const NotificationsScreen(),
         ),
         _NavItem(
           icon: Icons.person_outlined,
@@ -101,9 +99,15 @@ class _HomeScreenState extends State<HomeScreen> {
       // Client
       return [
         _NavItem(
+          icon: Icons.space_dashboard_outlined,
+          activeIcon: Icons.space_dashboard,
+          label: 'Início',
+          screen: const DashboardScreen(),
+        ),
+        _NavItem(
           icon: Icons.folder_outlined,
           activeIcon: Icons.folder,
-          label: 'Meus Projetos',
+          label: 'Projetos',
           screen: const ProjectsListScreen(),
         ),
         _NavItem(
@@ -111,12 +115,6 @@ class _HomeScreenState extends State<HomeScreen> {
           activeIcon: Icons.video_file,
           label: 'Entregas',
           screen: const DeliveriesListScreen(),
-        ),
-        _NavItem(
-          icon: Icons.notifications_outlined,
-          activeIcon: Icons.notifications,
-          label: 'Avisos',
-          screen: const NotificationsScreen(),
         ),
         _NavItem(
           icon: Icons.person_outlined,
@@ -146,46 +144,70 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
+          color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
               offset: const Offset(0, -2),
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          items: navItems.map((item) {
-            // Find the notifications tab
-            final isNotif = item.label == 'Avisos';
-            return BottomNavigationBarItem(
-              icon: isNotif && notifProvider.unreadCount > 0
-                  ? Badge(
-                      label: Text(
-                        notifProvider.unreadCount > 99
-                            ? '99+'
-                            : '${notifProvider.unreadCount}',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                      child: Icon(item.icon),
-                    )
-                  : Icon(item.icon),
-              activeIcon: isNotif && notifProvider.unreadCount > 0
-                  ? Badge(
-                      label: Text(
-                        notifProvider.unreadCount > 99
-                            ? '99+'
-                            : '${notifProvider.unreadCount}',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                      child: Icon(item.activeIcon),
-                    )
-                  : Icon(item.activeIcon),
-              label: item.label,
-            );
-          }).toList(),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(navItems.length, (index) {
+                final item = navItems[index];
+                final isSelected = _currentIndex == index;
+                return _buildNavItem(item, isSelected, index, notifProvider);
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+      _NavItem item, bool isSelected, int index, NotificationProvider notifs) {
+    return InkWell(
+      onTap: () => setState(() => _currentIndex = index),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 16 : 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primaryColor.withOpacity(0.1)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? item.activeIcon : item.icon,
+              size: 22,
+              color: isSelected ? AppTheme.primaryColor : AppTheme.textTertiary,
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 6),
+              Text(
+                item.label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryColor,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

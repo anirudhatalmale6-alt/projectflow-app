@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=videoflow
+      - DB_USER=videoflow
+      - DB_PASSWORD=${DB_PASSWORD:-videoflow_secret}
+      - JWT_SECRET=${JWT_SECRET:-change_me_in_production}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-change_me_in_production}
+      - JWT_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-videoflow-deliveries}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/uploads
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=videoflow
+      - POSTGRES_USER=videoflow
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-videoflow_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./src/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U videoflow -d videoflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

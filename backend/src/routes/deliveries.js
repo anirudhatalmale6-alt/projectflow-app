@@ -6,6 +6,8 @@ const auth = require('../middleware/auth');
 const { requireProjectAccess, requireProjectRole } = require('../middleware/rbac');
 const { logAudit, getClientIp } = require('../utils/audit');
 const pool = require('../config/database');
+const { upload, generateFileKey } = require('../middleware/upload');
+const FileService = require('../services/fileService');
 
 const router = express.Router();
 
@@ -32,13 +34,24 @@ router.get('/projects/:projectId/deliveries', requireProjectAccess(), async (req
 
 // POST /api/v1/projects/:projectId/deliveries - upload a delivery
 // Editors and managers can upload deliveries. Freelancers cannot. Clients cannot.
-router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'editor'), async (req, res, next) => {
+router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'editor'), upload.single('file'), async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const { title, description, format, file_url, file_size } = req.body;
+    const { title, description, format } = req.body;
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({ error: 'Delivery title is required.' });
+    }
+
+    let fileUrl = req.body.file_url || null;
+    let fileSize = req.body.file_size || null;
+
+    // Handle file upload if a file was provided
+    if (req.file) {
+      const fileKey = generateFileKey(projectId, req.file.originalname);
+      await FileService.upload(req.file.buffer, fileKey, req.file.mimetype);
+      fileUrl = fileKey;
+      fileSize = req.file.size;
     }
 
     const delivery = await DeliveryJob.create({
@@ -46,8 +59,8 @@ router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'ed
       title: title.trim(),
       description: description || null,
       format: format || null,
-      fileUrl: file_url || null,
-      fileSize: file_size || null,
+      fileUrl,
+      fileSize,
       uploadedBy: req.user.id,
     });
 
@@ -178,6 +191,49 @@ router.get('/deliveries/:id', async (req, res, next) => {
     );
 
     res.json({ delivery, approvals, comments });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/deliveries/:id/download - get presigned download URL for delivery file
+router.get('/deliveries/:id/download', async (req, res, next) => {
+  try {
+    const delivery = await DeliveryJob.findById(req.params.id);
+    if (!delivery) {
+      return res.status(404).json({ error: 'Delivery not found.' });
+    }
+
+    // Check project access
+    if (req.user.role !== 'admin') {
+      const membership = await Project.isMember(delivery.project_id, req.user.id);
+      const isClientAccess = req.user.role === 'client';
+
+      if (!membership && req.user.role !== 'manager') {
+        if (isClientAccess) {
+          const { rows } = await pool.query(
+            `SELECT 1 FROM projects p
+             JOIN clients c ON p.client_id = c.id
+             JOIN users u ON u.email = c.email
+             WHERE p.id = $1 AND u.id = $2`,
+            [delivery.project_id, req.user.id]
+          );
+          if (rows.length === 0) {
+            return res.status(403).json({ error: 'Access denied.' });
+          }
+        } else {
+          return res.status(403).json({ error: 'Access denied.' });
+        }
+      }
+    }
+
+    if (!delivery.file_url) {
+      return res.status(404).json({ error: 'No file attached to this delivery.' });
+    }
+
+    const downloadUrl = await FileService.getDownloadUrl(delivery.file_url);
+
+    res.json({ download_url: downloadUrl });
   } catch (err) {
     next(err);
   }

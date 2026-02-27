@@ -3,7 +3,11 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
+const crypto = require('crypto');
 const { Server } = require('socket.io');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const hpp = require('hpp');
 
 const errorHandler = require('./middleware/errorHandler');
 const setupSocket = require('./socket');
@@ -49,6 +53,37 @@ setupSocket(io);
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Security headers
+app.use(helmet());
+
+// Prevent HTTP Parameter Pollution
+app.use(hpp());
+
+// Rate limiting - general
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', generalLimiter);
+
+// Rate limiting - auth (stricter)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many authentication attempts, please try again later.' },
+});
+app.use('/api/v1/auth/', authLimiter);
+
+// Request ID tracking
+app.use((req, res, next) => {
+  req.requestId = crypto.randomUUID();
+  res.setHeader('X-Request-ID', req.requestId);
+  next();
+});
 
 // Request logging in development
 if (process.env.NODE_ENV !== 'production') {

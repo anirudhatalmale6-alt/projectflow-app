@@ -8,7 +8,7 @@ class ApiConfig {
       return origin;
     }
     // Mobile fallback
-    return 'http://167.235.196.123:3000';
+    return 'https://scheduling-repository-estimated-creating.trycloudflare.com';
   }
 
   static const String apiPrefix = '/api/v1';
@@ -18,7 +18,7 @@ class ApiConfig {
       final origin = Uri.base.origin;
       return origin.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
     }
-    return 'ws://167.235.196.123:3000';
+    return 'wss://scheduling-repository-estimated-creating.trycloudflare.com';
   }
 
   // Auth

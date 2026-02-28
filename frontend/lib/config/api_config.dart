@@ -8,7 +8,7 @@ class ApiConfig {
       return origin;
     }
     // Mobile fallback
-    return 'https://scheduling-repository-estimated-creating.trycloudflare.com';
+    return 'https://armstrong-southampton-senior-exclusive.trycloudflare.com';
   }
 
   static const String apiPrefix = '/api/v1';
@@ -18,7 +18,7 @@ class ApiConfig {
       final origin = Uri.base.origin;
       return origin.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
     }
-    return 'wss://scheduling-repository-estimated-creating.trycloudflare.com';
+    return 'wss://armstrong-southampton-senior-exclusive.trycloudflare.com';
   }
 
   // Auth

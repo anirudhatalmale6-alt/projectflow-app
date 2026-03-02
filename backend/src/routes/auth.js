@@ -373,7 +373,9 @@ router.get('/google', (req, res, next) => {
     return res.status(501).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' });
   }
   passport.authenticate('google', {
-    scope: ['profile', 'email'],
+    scope: ['profile', 'email', 'https://www.googleapis.com/auth/drive.file'],
+    accessType: 'offline',
+    prompt: 'consent',
     session: false,
   })(req, res, next);
 });

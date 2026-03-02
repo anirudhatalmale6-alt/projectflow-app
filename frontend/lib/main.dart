@@ -37,6 +37,7 @@ import 'screens/jobs/jobs_list_screen.dart';
 import 'screens/jobs/job_detail_screen.dart';
 import 'screens/calendar/calendar_screen.dart';
 import 'screens/reviews/review_player_screen.dart';
+import 'screens/drive/drive_files_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -95,6 +96,7 @@ class DuozzFlowApp extends StatelessWidget {
           '/jobs/detail': (context) => const JobDetailScreen(),
           '/calendar': (context) => const CalendarScreen(),
           '/reviews/player': (context) => const ReviewPlayerScreen(),
+          '/drive': (context) => const DriveFilesScreen(),
         },
       ),
     );

@@ -107,6 +107,20 @@ class ApiConfig {
   static String calendarEventById(String id) =>
       '$apiPrefix/calendar/events/$id';
 
+  // Google Drive
+  static String driveStatus(String projectId) =>
+      '$apiPrefix/projects/$projectId/drive/status';
+  static String driveSetup(String projectId) =>
+      '$apiPrefix/projects/$projectId/drive/setup';
+  static String driveFiles(String projectId) =>
+      '$apiPrefix/projects/$projectId/drive/files';
+  static String driveUpload(String projectId) =>
+      '$apiPrefix/projects/$projectId/drive/upload';
+  static String driveFileLink(String fileId) =>
+      '$apiPrefix/drive/files/$fileId/link';
+  static String driveFileDelete(String fileId) =>
+      '$apiPrefix/drive/files/$fileId';
+
   // Admin
   static const String adminUsers = '$apiPrefix/admin/users';
   static String adminUserById(String id) => '$apiPrefix/admin/users/$id';

@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const { requireProjectAccess, requireProjectManager, requireGlobalRole } = require('../middleware/rbac');
 const { logAudit, getClientIp } = require('../utils/audit');
 const pool = require('../config/database');
+const DriveService = require('../services/driveService');
 
 const router = express.Router();
 
@@ -75,6 +76,21 @@ router.post('/', requireGlobalRole('admin', 'manager'), async (req, res, next) =
     if (io) {
       io.to(`user:${req.user.id}`).emit('project_created', project);
     }
+
+    // Auto-create Google Drive folder structure (non-blocking)
+    DriveService.hasGoogleDrive(req.user.id).then(async (hasGD) => {
+      if (!hasGD) return;
+      try {
+        const driveResult = await DriveService.createProjectFolders(req.user.id, project.name);
+        await pool.query(
+          'UPDATE projects SET drive_folder_id = $1, drive_folder_url = $2, drive_folders = $3 WHERE id = $4',
+          [driveResult.drive_folder_id, driveResult.drive_folder_url, JSON.stringify(driveResult.drive_folders), project.id]
+        );
+        console.log(`Drive folders created for project ${project.id}`);
+      } catch (e) {
+        console.error(`Failed to create Drive folders for project ${project.id}:`, e.message);
+      }
+    }).catch(() => {});
 
     res.status(201).json({ project });
   } catch (err) {

@@ -31,7 +31,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {}); // Rebuild to update FAB
@@ -246,6 +246,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                     Tab(text: 'Jobs'),
                     Tab(text: 'Entregas'),
                     Tab(text: 'Chat'),
+                    Tab(text: 'Drive'),
                     Tab(text: 'Equipe'),
                     Tab(text: 'Calendário'),
                   ],
@@ -261,6 +262,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             _buildJobsTab(auth),
             _buildDeliveriesTab(auth),
             _buildChatTab(),
+            _buildDriveTab(),
             _buildTeamTab(),
             _buildCalendarTab(),
           ],
@@ -557,6 +559,41 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             onPressed: () => Navigator.pushNamed(context, '/chat', arguments: _projectId),
             icon: const Icon(Icons.chat),
             label: const Text('Abrir Chat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDriveTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.add_to_drive, size: 64, color: Colors.green[400]),
+          const SizedBox(height: 16),
+          const Text(
+            'Google Drive',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Organize arquivos do projeto com pastas automáticas',
+            style: TextStyle(color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pushNamed(context, '/drive', arguments: {
+              'projectId': _projectId,
+              'projectName': context.read<ProjectProvider>().currentProject?.name ?? 'Drive',
+            }),
+            icon: const Icon(Icons.folder_open),
+            label: const Text('Abrir Drive'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4285F4),
+              foregroundColor: Colors.white,
+            ),
           ),
         ],
       ),

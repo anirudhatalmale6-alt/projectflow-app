@@ -1,32 +1,18 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
-  static String? _customBaseUrl;
-  static const String _defaultBaseUrl = 'https://hopefully-conferencing-copy-sells.trycloudflare.com';
+  static const String _serverUrl = 'https://hopefully-conferencing-copy-sells.trycloudflare.com';
 
   static Future<void> loadConfig() async {
-    if (kIsWeb) return;
-    final prefs = await SharedPreferences.getInstance();
-    _customBaseUrl = prefs.getString('server_url');
+    // Using hardcoded HTTPS URL
   }
-
-  static Future<void> setServerUrl(String url) async {
-    // Remove trailing slash
-    url = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
-    _customBaseUrl = url;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('server_url', url);
-  }
-
-  static bool get hasCustomUrl => _customBaseUrl != null && _customBaseUrl!.isNotEmpty;
 
   static String get baseUrl {
     if (kIsWeb) {
       final origin = Uri.base.origin;
       return origin;
     }
-    return _customBaseUrl ?? _defaultBaseUrl;
+    return _serverUrl;
   }
 
   static const String apiPrefix = '/api/v1';
@@ -36,8 +22,7 @@ class ApiConfig {
       final origin = Uri.base.origin;
       return origin.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
     }
-    final base = _customBaseUrl ?? _defaultBaseUrl;
-    return base.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
+    return _serverUrl.replaceFirst('https://', 'wss://');
   }
 
   // Auth

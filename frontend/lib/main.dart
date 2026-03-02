@@ -31,7 +31,11 @@ import 'screens/admin/admin_users_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ApiConfig.loadConfig();
+  try {
+    await ApiConfig.loadConfig();
+  } catch (_) {
+    // Ignore config load errors, will use defaults
+  }
   runApp(const DuozzFlowApp());
 }
 

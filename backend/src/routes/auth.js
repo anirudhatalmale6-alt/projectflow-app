@@ -6,7 +6,44 @@ const auth = require('../middleware/auth');
 const pool = require('../config/database');
 const { logAudit, getClientIp } = require('../utils/audit');
 
+const passport = require('passport');
+const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
+
 const router = express.Router();
+
+// Configure Google OAuth if credentials are set
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || '/api/v1/auth/google/callback',
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const email = profile.emails[0].value.toLowerCase();
+      let user = await User.findByEmail(email);
+
+      if (user) {
+        // Update Google tokens
+        await pool.query(
+          'UPDATE users SET google_id = $1, google_access_token = $2, google_refresh_token = COALESCE($3, google_refresh_token), avatar_url = COALESCE(avatar_url, $4) WHERE id = $5',
+          [profile.id, accessToken, refreshToken, profile.photos?.[0]?.value, user.id]
+        );
+      } else {
+        // Create new user from Google
+        const result = await pool.query(
+          `INSERT INTO users (name, email, google_id, google_access_token, google_refresh_token, avatar_url, role)
+           VALUES ($1, $2, $3, $4, $5, $6, 'editor') RETURNING *`,
+          [profile.displayName, email, profile.id, accessToken, refreshToken, profile.photos?.[0]?.value]
+        );
+        user = result.rows[0];
+      }
+
+      done(null, user);
+    } catch (err) {
+      done(err, null);
+    }
+  }));
+}
 
 /**
  * Generate an access token (short-lived).
@@ -328,6 +365,48 @@ router.put('/profile', auth, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// GET /api/v1/auth/google - Initiate Google OAuth
+router.get('/google', (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(501).json({ error: 'Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' });
+  }
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: false,
+  })(req, res, next);
+});
+
+// GET /api/v1/auth/google/callback
+router.get('/google/callback', (req, res, next) => {
+  passport.authenticate('google', { session: false }, async (err, user) => {
+    if (err || !user) {
+      // Redirect to frontend with error
+      const frontendUrl = process.env.FRONTEND_URL || '';
+      return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+    }
+
+    try {
+      const access_token = generateAccessToken(user.id);
+      const refresh_token = await generateRefreshToken(user.id);
+
+      await logAudit({
+        userId: user.id,
+        action: 'google_login',
+        entityType: 'user',
+        entityId: user.id,
+        details: { provider: 'google' },
+        ipAddress: getClientIp(req),
+      });
+
+      // Redirect to frontend with tokens
+      const frontendUrl = process.env.FRONTEND_URL || '';
+      res.redirect(`${frontendUrl}/login?access_token=${access_token}&refresh_token=${refresh_token}`);
+    } catch (error) {
+      next(error);
+    }
+  })(req, res, next);
 });
 
 module.exports = router;

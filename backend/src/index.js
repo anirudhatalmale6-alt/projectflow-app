@@ -24,6 +24,11 @@ const commentRoutes = require('./routes/comments');
 const notificationRoutes = require('./routes/notifications');
 const dashboardRoutes = require('./routes/dashboard');
 const adminRoutes = require('./routes/admin');
+const jobRoutes = require('./routes/jobs');
+const assetRoutes = require('./routes/assets');
+const reviewRoutes = require('./routes/reviews');
+const chatRoutes = require('./routes/chat');
+const calendarRoutes = require('./routes/calendar');
 
 const app = express();
 const server = http.createServer(app);
@@ -150,6 +155,21 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 
 // Admin
 app.use('/api/v1/admin', adminRoutes);
+
+// Jobs (video deliverable jobs)
+app.use('/api/v1', jobRoutes);
+
+// Assets & Versions
+app.use('/api/v1', assetRoutes);
+
+// Reviews & Review Comments
+app.use('/api/v1', reviewRoutes);
+
+// Chat Channels & Messages
+app.use('/api/v1', chatRoutes);
+
+// Calendar Events
+app.use('/api/v1', calendarRoutes);
 
 // =============================================================
 

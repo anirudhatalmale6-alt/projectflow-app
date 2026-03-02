@@ -78,7 +78,9 @@ class ApiService {
       }
     }
 
-    final message = body is Map ? (body['message'] ?? 'Erro desconhecido') : 'Erro desconhecido';
+    final message = body is Map
+        ? (body['message'] ?? body['error'] ?? 'Erro HTTP ${response.statusCode}')
+        : 'Erro HTTP ${response.statusCode}: ${response.body.length > 200 ? response.body.substring(0, 200) : response.body}';
     throw ApiException(response.statusCode, message, data: body);
   }
 

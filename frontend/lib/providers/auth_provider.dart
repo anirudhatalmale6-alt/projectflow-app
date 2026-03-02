@@ -136,6 +136,6 @@ class AuthProvider with ChangeNotifier {
     if (error is ApiException) {
       return error.message;
     }
-    return 'Ocorreu um erro inesperado. Tente novamente.';
+    return 'Erro de conexão: ${error.runtimeType} - $error';
   }
 }

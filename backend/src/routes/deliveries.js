@@ -37,7 +37,7 @@ router.get('/projects/:projectId/deliveries', requireProjectAccess(), async (req
 router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'editor'), upload.single('file'), async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const { title, description, format } = req.body;
+    const { title, description, format, task_id } = req.body;
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({ error: 'Delivery title is required.' });
@@ -55,6 +55,7 @@ router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'ed
 
     const delivery = await DeliveryJob.create({
       projectId,
+      taskId: task_id || null,
       title: title.trim(),
       description: description || null,
       format: format || null,
@@ -128,6 +129,99 @@ router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'ed
       entityType: 'delivery',
       entityId: delivery.id,
       details: { title: delivery.title, version: delivery.version, format: delivery.format, project_id: projectId },
+      ipAddress: getClientIp(req),
+    });
+
+    res.status(201).json({ delivery });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/tasks/:taskId/deliveries - list deliveries for a specific task
+router.get('/tasks/:taskId/deliveries', async (req, res, next) => {
+  try {
+    const { taskId } = req.params;
+    const { status, limit = 50, offset = 0 } = req.query;
+
+    // Verify task exists and user has access
+    const Task = require('../models/Task');
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found.' });
+    }
+
+    // Check project access
+    if (req.user.role !== 'admin') {
+      const membership = await Project.isMember(task.project_id, req.user.id);
+      if (!membership) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+    }
+
+    const deliveries = await DeliveryJob.findByTaskId(taskId, {
+      status: status || undefined,
+      limit: Math.min(parseInt(limit, 10) || 50, 200),
+      offset: parseInt(offset, 10) || 0,
+    });
+
+    res.json({ deliveries });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/tasks/:taskId/deliveries - upload a delivery for a specific task
+router.post('/tasks/:taskId/deliveries', upload.single('file'), async (req, res, next) => {
+  try {
+    const { taskId } = req.params;
+    const { title, description, format } = req.body;
+
+    // Verify task exists
+    const Task = require('../models/Task');
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found.' });
+    }
+
+    const projectId = task.project_id;
+
+    // Check project access
+    if (req.user.role !== 'admin') {
+      const membership = await Project.isMember(projectId, req.user.id);
+      if (!membership) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+    }
+
+    const deliveryTitle = (title && title.trim()) || task.title || 'Entrega';
+
+    let fileUrl = req.body.file_url || null;
+    let fileSize = req.body.file_size || null;
+
+    if (req.file) {
+      const result = await FileService.upload(req.file.buffer, req.file.originalname, req.file.mimetype, projectId);
+      fileUrl = result.fileId;
+      fileSize = result.size || req.file.size;
+    }
+
+    const delivery = await DeliveryJob.create({
+      projectId,
+      taskId,
+      title: deliveryTitle,
+      description: description || null,
+      format: format || null,
+      fileUrl,
+      fileSize,
+      uploadedBy: req.user.id,
+    });
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'create',
+      entityType: 'delivery',
+      entityId: delivery.id,
+      details: { title: delivery.title, task_id: taskId, project_id: projectId },
       ipAddress: getClientIp(req),
     });
 

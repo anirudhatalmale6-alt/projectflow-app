@@ -223,4 +223,28 @@ class ApiService {
     final response = await http.Response.fromStream(streamedResponse);
     return _handleResponse(response);
   }
+
+  Future<dynamic> multipartPostBytes(
+    String path, {
+    required Map<String, String> fields,
+    required List<int> fileBytes,
+    required String fileName,
+    String fileField = 'file',
+  }) async {
+    final uri = _buildUri(path);
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(_headers);
+    request.headers.remove('Content-Type');
+    request.fields.addAll(fields);
+
+    request.files.add(http.MultipartFile.fromBytes(
+      fileField,
+      fileBytes,
+      filename: fileName,
+    ));
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    return _handleResponse(response);
+  }
 }

@@ -1,17 +1,18 @@
 const pool = require('../config/database');
 
 const DeliveryJob = {
-  async create({ projectId, title, description, format, fileUrl, fileSize, uploadedBy }) {
+  async create({ projectId, title, description, format, fileUrl, fileSize, uploadedBy, taskId }) {
     // version is auto-incremented by the database trigger
     const { rows } = await pool.query(
-      `INSERT INTO delivery_jobs (project_id, title, description, format, file_url, file_size, status, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO delivery_jobs (project_id, title, description, format, file_url, file_size, status, uploaded_by, task_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         projectId, title, description || null, format || null,
         fileUrl || null, fileSize || null,
         fileUrl ? 'uploaded' : 'pending',
         uploadedBy,
+        taskId || null,
       ]
     );
     return rows[0];
@@ -85,6 +86,32 @@ const DeliveryJob = {
       values
     );
     return rows[0] || null;
+  },
+
+  async findByTaskId(taskId, { status, limit = 50, offset = 0 } = {}) {
+    let query = `
+      SELECT dj.*,
+        u_up.name AS uploaded_by_name, u_up.avatar_url AS uploaded_by_avatar,
+        u_rev.name AS reviewed_by_name
+      FROM delivery_jobs dj
+      LEFT JOIN users u_up ON dj.uploaded_by = u_up.id
+      LEFT JOIN users u_rev ON dj.reviewed_by = u_rev.id
+      WHERE dj.task_id = $1
+    `;
+    const values = [taskId];
+    let paramIndex = 2;
+
+    if (status) {
+      query += ` AND dj.status = $${paramIndex}`;
+      values.push(status);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY dj.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    values.push(limit, offset);
+
+    const { rows } = await pool.query(query, values);
+    return rows;
   },
 
   async countByProject(projectId) {

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../config/theme.dart';
+import '../../config/api_config.dart';
 import '../../models/comment.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../services/api_service.dart';
 import '../../services/comment_service.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/priority_badge.dart';
@@ -21,9 +24,13 @@ class TaskDetailScreen extends StatefulWidget {
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final CommentService _commentService = CommentService();
+  final ApiService _api = ApiService();
   List<Comment> _comments = [];
+  List<dynamic> _deliveries = [];
   bool _loadingComments = false;
+  bool _loadingDeliveries = false;
   bool _sendingComment = false;
+  bool _uploading = false;
   String? _taskId;
 
   @override
@@ -34,6 +41,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _taskId = id;
       context.read<TaskProvider>().loadTask(id);
       _loadComments();
+      _loadDeliveries();
     }
   }
 
@@ -44,6 +52,68 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _comments = await _commentService.getComments('task', _taskId!);
     } catch (_) {}
     setState(() => _loadingComments = false);
+  }
+
+  Future<void> _loadDeliveries() async {
+    if (_taskId == null) return;
+    setState(() => _loadingDeliveries = true);
+    try {
+      final data = await _api.get(ApiConfig.deliveriesByTask(_taskId!));
+      final list = data['deliveries'] ?? data['data'] ?? [];
+      setState(() => _deliveries = List<dynamic>.from(list));
+    } catch (_) {
+      setState(() => _deliveries = []);
+    }
+    setState(() => _loadingDeliveries = false);
+  }
+
+  Future<void> _uploadDelivery() async {
+    final task = context.read<TaskProvider>().currentTask;
+    if (task == null || _taskId == null) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.first;
+    if (file.bytes == null) return;
+
+    setState(() => _uploading = true);
+
+    try {
+      await _api.multipartPostBytes(
+        ApiConfig.deliveriesByTask(_taskId!),
+        fields: {
+          'title': file.name,
+        },
+        fileBytes: file.bytes!,
+        fileName: file.name,
+        fileField: 'file',
+      );
+      await _loadDeliveries();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Arquivo enviado com sucesso!'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao enviar: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+
+    setState(() => _uploading = false);
   }
 
   Future<void> _addComment(String content) async {
@@ -61,6 +131,88 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   void _changeStatus(String newStatus) {
     context.read<TaskProvider>().updateTaskStatus(_taskId!, newStatus);
+  }
+
+  String _formatFileSize(dynamic size) {
+    if (size == null) return '';
+    final bytes = size is int ? size : int.tryParse(size.toString()) ?? 0;
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return 'Pendente';
+      case 'uploaded':
+        return 'Enviado';
+      case 'in_review':
+        return 'Em Revisão';
+      case 'approved':
+        return 'Aprovado';
+      case 'rejected':
+        return 'Rejeitado';
+      case 'revision_requested':
+        return 'Revisão Solicitada';
+      default:
+        return status;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'approved':
+        return AppTheme.successColor;
+      case 'rejected':
+        return AppTheme.errorColor;
+      case 'in_review':
+        return AppTheme.warningColor;
+      case 'uploaded':
+        return AppTheme.primaryColor;
+      case 'revision_requested':
+        return Colors.orange;
+      default:
+        return AppTheme.textTertiary;
+    }
+  }
+
+  IconData _getFileIcon(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'mp4':
+      case 'mov':
+      case 'avi':
+      case 'mkv':
+      case 'webm':
+        return Icons.video_file;
+      case 'mp3':
+      case 'wav':
+      case 'aac':
+        return Icons.audio_file;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+        return Icons.image;
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'zip':
+      case 'rar':
+      case '7z':
+        return Icons.folder_zip;
+      case 'psd':
+      case 'ai':
+      case 'svg':
+        return Icons.design_services;
+      case 'prproj':
+      case 'aep':
+      case 'drp':
+        return Icons.movie_creation;
+      default:
+        return Icons.insert_drive_file;
+    }
   }
 
   @override
@@ -261,7 +413,245 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
-                  // Comments
+
+                  // ============ DELIVERIES SECTION ============
+                  Row(
+                    children: [
+                      const Icon(Icons.upload_file,
+                          size: 20, color: AppTheme.primaryColor),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Entregas / Arquivos',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${_deliveries.length}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      _uploading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.add_circle,
+                                  color: AppTheme.primaryColor),
+                              tooltip: 'Enviar arquivo',
+                              onPressed: _uploadDelivery,
+                            ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Upload button area
+                  InkWell(
+                    onTap: _uploading ? null : _uploadDelivery,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primaryColor.withOpacity(0.2),
+                          style: BorderStyle.solid,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            _uploading
+                                ? Icons.hourglass_top
+                                : Icons.cloud_upload_outlined,
+                            size: 36,
+                            color: AppTheme.primaryColor.withOpacity(0.6),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _uploading
+                                ? 'Enviando arquivo...'
+                                : 'Toque para enviar arquivo',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.primaryColor.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Videos, imagens, PDFs, arquivos de projeto...',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Delivery list
+                  _loadingDeliveries
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : _deliveries.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                'Nenhuma entrega ainda',
+                                style: TextStyle(
+                                  color: AppTheme.textTertiary,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            )
+                          : Column(
+                              children: _deliveries.map((d) {
+                                final title = d['title'] ?? 'Sem título';
+                                final status = d['status'] ?? 'pending';
+                                final fileSize = d['file_size'];
+                                final uploadedBy =
+                                    d['uploaded_by_name'] ?? 'Desconhecido';
+                                final createdAt = d['created_at'] != null
+                                    ? DateFormat('dd/MM/yyyy HH:mm').format(
+                                        DateTime.parse(d['created_at'])
+                                            .toLocal())
+                                    : '';
+                                final version = d['version'] ?? 1;
+
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: ListTile(
+                                    leading: Container(
+                                      width: 42,
+                                      height: 42,
+                                      decoration: BoxDecoration(
+                                        color: _getStatusColor(status)
+                                            .withOpacity(0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        _getFileIcon(title),
+                                        color: _getStatusColor(status),
+                                        size: 22,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: _getStatusColor(status)
+                                                    .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                _getStatusLabel(status),
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                  color:
+                                                      _getStatusColor(status),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'v$version',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                color: AppTheme.textTertiary,
+                                              ),
+                                            ),
+                                            if (fileSize != null) ...[
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                _formatFileSize(fileSize),
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color:
+                                                      AppTheme.textTertiary,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '$uploadedBy • $createdAt',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.textTertiary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    isThreeLine: true,
+                                    dense: true,
+                                    trailing: d['file_url'] != null
+                                        ? IconButton(
+                                            icon: const Icon(
+                                              Icons.download,
+                                              size: 20,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                            tooltip: 'Baixar',
+                                            onPressed: () =>
+                                                _downloadDelivery(d['id']),
+                                          )
+                                        : null,
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                  const SizedBox(height: 24),
+
+                  // ============ COMMENTS SECTION ============
                   Row(
                     children: [
                       const Text(
@@ -328,6 +718,35 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _downloadDelivery(String deliveryId) async {
+    try {
+      final data = await _api.get(ApiConfig.deliveryDownload(deliveryId));
+      final url = data['download_url'];
+      if (url != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Link de download copiado!'),
+            backgroundColor: AppTheme.successColor,
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao obter download: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildStatusButton(String label, String status, Color color) {

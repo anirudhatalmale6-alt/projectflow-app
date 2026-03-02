@@ -57,7 +57,10 @@ class ApiConfig {
   static const String deliveries = '$apiPrefix/deliveries';
   static String deliveriesByProject(String projectId) =>
       '$apiPrefix/projects/$projectId/deliveries';
+  static String deliveriesByTask(String taskId) =>
+      '$apiPrefix/tasks/$taskId/deliveries';
   static String deliveryById(String id) => '$apiPrefix/deliveries/$id';
+  static String deliveryDownload(String id) => '$apiPrefix/deliveries/$id/download';
   static String deliveryApprove(String id) => '$apiPrefix/deliveries/$id/approve';
   static String deliveryReject(String id) => '$apiPrefix/deliveries/$id/reject';
   static String deliveryRevision(String id) =>

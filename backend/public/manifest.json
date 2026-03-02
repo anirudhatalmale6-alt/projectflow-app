@@ -1,0 +1,11 @@
+{
+  "name": "Duozz Flow",
+  "short_name": "Duozz Flow",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F1F5F9",
+  "theme_color": "#2563EB",
+  "description": "Duozz Flow Platform",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false
+}

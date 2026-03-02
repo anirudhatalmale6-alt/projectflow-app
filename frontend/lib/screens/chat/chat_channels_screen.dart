@@ -13,6 +13,7 @@ class ChatChannelsScreen extends StatefulWidget {
 
 class _ChatChannelsScreenState extends State<ChatChannelsScreen> {
   String? _projectId;
+  bool _initializing = true;
 
   @override
   void didChangeDependencies() {
@@ -20,7 +21,34 @@ class _ChatChannelsScreenState extends State<ChatChannelsScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is String && args != _projectId) {
       _projectId = args;
-      context.read<ChatProvider>().loadChannels(_projectId!);
+      _initChat();
+    }
+  }
+
+  Future<void> _initChat() async {
+    if (_projectId == null) return;
+    setState(() => _initializing = true);
+
+    final chat = context.read<ChatProvider>();
+    chat.joinProject(_projectId!);
+    await chat.loadChannels(_projectId!);
+
+    // Auto-create "Geral" channel if none exist
+    if (chat.channels.isEmpty && mounted) {
+      await chat.createChannel(_projectId!, name: 'Geral');
+    }
+
+    if (!mounted) return;
+    setState(() => _initializing = false);
+
+    // If only one channel, go directly to messages
+    if (chat.channels.length == 1 && mounted) {
+      final channel = chat.channels.first;
+      Navigator.pushReplacementNamed(context, '/chat/messages', arguments: {
+        'channelId': channel.id,
+        'channelName': channel.name,
+        'projectId': _projectId,
+      });
     }
   }
 
@@ -32,7 +60,7 @@ class _ChatChannelsScreenState extends State<ChatChannelsScreen> {
       appBar: AppBar(
         title: const Text('Chat'),
       ),
-      body: chatProvider.isLoading
+      body: (_initializing || chatProvider.isLoading)
           ? const Center(child: CircularProgressIndicator())
           : chatProvider.channels.isEmpty
               ? _buildEmpty()
@@ -46,7 +74,7 @@ class _ChatChannelsScreenState extends State<ChatChannelsScreen> {
                     },
                   ),
                 ),
-      floatingActionButton: _projectId != null
+      floatingActionButton: _projectId != null && !_initializing
           ? FloatingActionButton.extended(
               onPressed: () => _showCreateChannel(),
               icon: const Icon(Icons.add),
@@ -85,7 +113,11 @@ class _ChatChannelsScreenState extends State<ChatChannelsScreen> {
         leading: CircleAvatar(
           backgroundColor: AppTheme.primaryColor.withAlpha(25),
           child: Icon(
-            channel.type == 'project' ? Icons.tag : Icons.work_outline,
+            channel.type == 'project'
+                ? Icons.tag
+                : channel.type == 'direct'
+                    ? Icons.person
+                    : Icons.work_outline,
             color: AppTheme.primaryColor,
           ),
         ),

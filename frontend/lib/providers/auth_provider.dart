@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
@@ -41,6 +42,7 @@ class AuthProvider with ChangeNotifier {
       if (_apiService.hasTokens) {
         _user = await _authService.me();
         _state = AuthState.authenticated;
+        await _connectSocket();
       } else {
         _state = AuthState.unauthenticated;
       }
@@ -63,6 +65,7 @@ class AuthProvider with ChangeNotifier {
         _user = await _authService.me();
       }
       _state = AuthState.authenticated;
+      await _connectSocket();
       notifyListeners();
       return true;
     } catch (e) {
@@ -82,6 +85,7 @@ class AuthProvider with ChangeNotifier {
       await _apiService.saveTokens(accessToken, refreshToken);
       _user = await _authService.me();
       _state = AuthState.authenticated;
+      await _connectSocket();
       notifyListeners();
       return true;
     } catch (e) {
@@ -115,6 +119,7 @@ class AuthProvider with ChangeNotifier {
         _user = await _authService.me();
       }
       _state = AuthState.authenticated;
+      await _connectSocket();
       notifyListeners();
       return true;
     } catch (e) {
@@ -150,6 +155,14 @@ class AuthProvider with ChangeNotifier {
       _state = AuthState.unauthenticated;
     }
     notifyListeners();
+  }
+
+  Future<SharedPreferences> _getPrefs() => SharedPreferences.getInstance();
+
+  Future<void> _connectSocket() async {
+    final prefs = await _getPrefs();
+    final token = prefs.getString('access_token');
+    if (token != null) _socketService.connect(token);
   }
 
   String _parseError(dynamic error) {

@@ -2,22 +2,104 @@ import 'package:flutter/foundation.dart';
 import '../models/chat_channel.dart';
 import '../models/chat_message.dart';
 import '../services/chat_service.dart';
+import '../services/socket_service.dart';
 import '../services/api_service.dart';
 
 class ChatProvider with ChangeNotifier {
   final ChatService _service = ChatService();
+  final SocketService _socket = SocketService();
 
   List<ChatChannel> _channels = [];
   List<ChatMessage> _messages = [];
   ChatChannel? _currentChannel;
+  String? _currentProjectId;
   bool _isLoading = false;
   String? _errorMessage;
+  String? _typingUser;
 
   List<ChatChannel> get channels => _channels;
   List<ChatMessage> get messages => _messages;
   ChatChannel? get currentChannel => _currentChannel;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  String? get typingUser => _typingUser;
+
+  void _setupSocketListeners() {
+    _socket.on('chat_message', (data) {
+      if (data == null) return;
+      try {
+        final msgData = data['message'] ?? data;
+        final channelId = data['channel_id'] ?? msgData['channel_id'];
+        if (_currentChannel?.id == channelId) {
+          final msg = ChatMessage.fromJson(msgData is Map<String, dynamic>
+              ? msgData
+              : Map<String, dynamic>.from(msgData));
+          final exists = _messages.any((m) => m.id == msg.id);
+          if (!exists) {
+            _messages.add(msg);
+            notifyListeners();
+          }
+        }
+      } catch (_) {}
+    });
+
+    _socket.on('user_typing', (data) {
+      if (data == null) return;
+      try {
+        _typingUser = data['user_name'] as String?;
+        notifyListeners();
+        // Auto-clear after 3 seconds
+        Future.delayed(const Duration(seconds: 3), () {
+          if (_typingUser == data['user_name']) {
+            _typingUser = null;
+            notifyListeners();
+          }
+        });
+      } catch (_) {}
+    });
+
+    _socket.on('user_stop_typing', (data) {
+      _typingUser = null;
+      notifyListeners();
+    });
+  }
+
+  void joinProject(String projectId) {
+    _currentProjectId = projectId;
+    _socket.joinProject(projectId);
+    _setupSocketListeners();
+  }
+
+  void leaveProject() {
+    if (_currentProjectId != null) {
+      _socket.leaveProject(_currentProjectId!);
+    }
+    _socket.off('chat_message');
+    _socket.off('user_typing');
+    _socket.off('user_stop_typing');
+    _currentProjectId = null;
+    _typingUser = null;
+  }
+
+  void sendTyping(String channelId) {
+    if (_currentProjectId != null) {
+      _socket.emit('typing', {
+        'projectId': _currentProjectId,
+        'entityType': 'channel',
+        'entityId': channelId,
+      });
+    }
+  }
+
+  void sendStopTyping(String channelId) {
+    if (_currentProjectId != null) {
+      _socket.emit('stop_typing', {
+        'projectId': _currentProjectId,
+        'entityType': 'channel',
+        'entityId': channelId,
+      });
+    }
+  }
 
   Future<void> loadChannels(String projectId) async {
     _isLoading = true;
@@ -41,10 +123,12 @@ class ChatProvider with ChangeNotifier {
 
     try {
       _messages = await _service.getMessages(channelId);
-      _currentChannel = _channels.firstWhere(
-        (c) => c.id == channelId,
-        orElse: () => _channels.first,
-      );
+      _currentChannel = _channels.isNotEmpty
+          ? _channels.firstWhere(
+              (c) => c.id == channelId,
+              orElse: () => _channels.first,
+            )
+          : null;
     } catch (e) {
       _errorMessage = _parseError(e);
     }
@@ -56,7 +140,11 @@ class ChatProvider with ChangeNotifier {
   Future<bool> sendMessage(String channelId, String content) async {
     try {
       final msg = await _service.sendMessage(channelId, content);
-      _messages.add(msg);
+      // Only add if not already added by socket
+      final exists = _messages.any((m) => m.id == msg.id);
+      if (!exists) {
+        _messages.add(msg);
+      }
       notifyListeners();
       return true;
     } catch (e) {
@@ -79,6 +167,15 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  /// Ensure a default "Geral" channel exists for a project
+  Future<ChatChannel?> ensureDefaultChannel(String projectId) async {
+    await loadChannels(projectId);
+    if (_channels.isEmpty) {
+      return await createChannel(projectId, name: 'Geral');
+    }
+    return _channels.first;
+  }
+
   void addMessageFromSocket(ChatMessage message) {
     if (_currentChannel?.id == message.channelId) {
       final exists = _messages.any((m) => m.id == message.id);
@@ -92,6 +189,7 @@ class ChatProvider with ChangeNotifier {
   void clearMessages() {
     _messages = [];
     _currentChannel = null;
+    _typingUser = null;
     notifyListeners();
   }
 

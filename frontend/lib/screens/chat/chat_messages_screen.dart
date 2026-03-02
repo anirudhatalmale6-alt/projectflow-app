@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -18,6 +19,8 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
   final _scrollController = ScrollController();
   String? _channelId;
   String? _channelName;
+  String? _projectId;
+  Timer? _typingTimer;
 
   @override
   void didChangeDependencies() {
@@ -26,7 +29,14 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
     if (args is Map<String, dynamic> && args['channelId'] != _channelId) {
       _channelId = args['channelId'] as String;
       _channelName = args['channelName'] as String? ?? 'Chat';
-      context.read<ChatProvider>().loadMessages(_channelId!);
+      _projectId = args['projectId'] as String?;
+
+      final chat = context.read<ChatProvider>();
+      // Make sure we're joined to the project room
+      if (_projectId != null) {
+        chat.joinProject(_projectId!);
+      }
+      chat.loadMessages(_channelId!);
     }
   }
 
@@ -34,6 +44,13 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _typingTimer?.cancel();
+    // Clean up when leaving chat
+    try {
+      final chat = context.read<ChatProvider>();
+      chat.clearMessages();
+      chat.leaveProject();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -49,12 +66,30 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
     });
   }
 
+  void _onTextChanged(String text) {
+    if (_channelId == null) return;
+    final chat = context.read<ChatProvider>();
+
+    // Send typing event
+    chat.sendTyping(_channelId!);
+
+    // Reset timer - stop typing after 2 seconds of inactivity
+    _typingTimer?.cancel();
+    _typingTimer = Timer(const Duration(seconds: 2), () {
+      chat.sendStopTyping(_channelId!);
+    });
+  }
+
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _channelId == null) return;
 
     _messageController.clear();
-    final sent = await context.read<ChatProvider>().sendMessage(_channelId!, text);
+    _typingTimer?.cancel();
+    final chat = context.read<ChatProvider>();
+    chat.sendStopTyping(_channelId!);
+
+    final sent = await chat.sendMessage(_channelId!, text);
     if (sent) _scrollToBottom();
   }
 
@@ -74,10 +109,20 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_channelName ?? 'Chat', style: const TextStyle(fontSize: 16)),
-            Text(
-              '${chatProvider.messages.length} mensagens',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
+            if (chatProvider.typingUser != null)
+              Text(
+                '${chatProvider.typingUser} está digitando...',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.primaryColor,
+                  fontStyle: FontStyle.italic,
+                ),
+              )
+            else
+              Text(
+                '${chatProvider.messages.length} mensagens',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
           ],
         ),
       ),
@@ -91,7 +136,8 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[400]),
+                            Icon(Icons.chat_bubble_outline,
+                                size: 48, color: Colors.grey[400]),
                             const SizedBox(height: 12),
                             Text(
                               'Nenhuma mensagem ainda',
@@ -100,7 +146,8 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
                             const SizedBox(height: 4),
                             Text(
                               'Envie a primeira mensagem!',
-                              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                              style: TextStyle(
+                                  color: Colors.grey[500], fontSize: 13),
                             ),
                           ],
                         ),
@@ -114,8 +161,19 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
                           final isMe = msg.userId == currentUserId;
                           final showName = !isMe &&
                               (index == 0 ||
-                                  chatProvider.messages[index - 1].userId != msg.userId);
-                          return _buildMessage(msg, isMe, showName);
+                                  chatProvider.messages[index - 1].userId !=
+                                      msg.userId);
+                          final showDate = index == 0 ||
+                              _isDifferentDay(
+                                chatProvider.messages[index - 1].createdAt,
+                                msg.createdAt,
+                              );
+                          return Column(
+                            children: [
+                              if (showDate) _buildDateDivider(msg.createdAt),
+                              _buildMessage(msg, isMe, showName),
+                            ],
+                          );
                         },
                       ),
           ),
@@ -123,6 +181,55 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
         ],
       ),
     );
+  }
+
+  bool _isDifferentDay(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return true;
+    return a.day != b.day || a.month != b.month || a.year != b.year;
+  }
+
+  Widget _buildDateDivider(DateTime? date) {
+    final text = date != null
+        ? _isToday(date)
+            ? 'Hoje'
+            : _isYesterday(date)
+                ? 'Ontem'
+                : DateFormat('dd/MM/yyyy').format(date)
+        : '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: Colors.grey[300])),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[500],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(child: Divider(color: Colors.grey[300])),
+        ],
+      ),
+    );
+  }
+
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.day == now.day &&
+        date.month == now.month &&
+        date.year == now.year;
+  }
+
+  bool _isYesterday(DateTime date) {
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    return date.day == yesterday.day &&
+        date.month == yesterday.month &&
+        date.year == yesterday.year;
   }
 
   Widget _buildMessage(ChatMessage msg, bool isMe, bool showName) {
@@ -136,7 +243,8 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
           right: isMe ? 0 : 60,
         ),
         child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             if (showName)
               Padding(
@@ -151,11 +259,10 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
                 ),
               ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isMe
-                    ? AppTheme.primaryColor
-                    : Colors.grey[200],
+                color: isMe ? AppTheme.primaryColor : Colors.grey[200],
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -180,9 +287,8 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
                         : '',
                     style: TextStyle(
                       fontSize: 10,
-                      color: isMe
-                          ? Colors.white.withAlpha(179)
-                          : Colors.grey[500],
+                      color:
+                          isMe ? Colors.white.withAlpha(179) : Colors.grey[500],
                     ),
                   ),
                 ],
@@ -221,9 +327,11 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
                   ),
                   filled: true,
                   fillColor: Colors.grey[100],
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 ),
                 textInputAction: TextInputAction.send,
+                onChanged: _onTextChanged,
                 onSubmitted: (_) => _sendMessage(),
                 maxLines: null,
               ),

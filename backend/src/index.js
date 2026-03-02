@@ -51,6 +51,9 @@ app.set('io', io);
 // Setup Socket.IO event handlers
 setupSocket(io);
 
+// Trust proxy (Cloudflare tunnel)
+app.set('trust proxy', 1);
+
 // Gzip compression for faster loading
 app.use(compression());
 

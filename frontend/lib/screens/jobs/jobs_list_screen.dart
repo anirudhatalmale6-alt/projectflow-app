@@ -76,8 +76,9 @@ class _JobsListScreenState extends State<JobsListScreen> {
       {'value': null, 'label': 'Todos'},
       {'value': 'pending', 'label': 'Pendente'},
       {'value': 'in_progress', 'label': 'Em Progresso'},
-      {'value': 'review', 'label': 'Revisão'},
-      {'value': 'done', 'label': 'Concluído'},
+      {'value': 'in_review', 'label': 'Em Revisão'},
+      {'value': 'approved', 'label': 'Aprovado'},
+      {'value': 'delivered', 'label': 'Entregue'},
     ];
 
     return SingleChildScrollView(
@@ -238,9 +239,10 @@ class _JobsListScreenState extends State<JobsListScreen> {
     switch (status) {
       case 'pending': return Colors.grey;
       case 'in_progress': return const Color(0xFF2563EB);
-      case 'review': return const Color(0xFFF59E0B);
+      case 'in_review': return const Color(0xFFF59E0B);
+      case 'revision': return Colors.orange;
       case 'approved': return const Color(0xFF16A34A);
-      case 'done': return const Color(0xFF16A34A);
+      case 'delivered': return const Color(0xFF059669);
       default: return Colors.grey;
     }
   }
@@ -261,6 +263,8 @@ class _JobsListScreenState extends State<JobsListScreen> {
     final titleController = TextEditingController();
     final descController = TextEditingController();
     String selectedType = 'edit';
+    String selectedPriority = 'medium';
+    DateTime? selectedDate;
 
     showModalBottomSheet(
       context: context,
@@ -276,71 +280,128 @@ class _JobsListScreenState extends State<JobsListScreen> {
             top: 24,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Novo Job',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Título',
-                  border: OutlineInputBorder(),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Novo Job',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descController,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição (opcional)',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Título',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
                 ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedType,
-                decoration: const InputDecoration(
-                  labelText: 'Tipo',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  decoration: const InputDecoration(
+                    labelText: 'Descrição (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'edit', child: Text('Edição')),
-                  DropdownMenuItem(value: 'color_grade', child: Text('Cor')),
-                  DropdownMenuItem(value: 'motion_graphics', child: Text('Motion')),
-                  DropdownMenuItem(value: 'audio_mix', child: Text('Áudio')),
-                  DropdownMenuItem(value: 'subtitles', child: Text('Legendas')),
-                  DropdownMenuItem(value: 'vfx', child: Text('VFX')),
-                  DropdownMenuItem(value: 'other', child: Text('Outro')),
-                ],
-                onChanged: (v) => setSheetState(() => selectedType = v!),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final title = titleController.text.trim();
-                    if (title.isEmpty) return;
-                    final job = await context.read<JobProvider>().createJob(
-                      _projectId!,
-                      {
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: selectedType,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'edit', child: Text('Edição')),
+                          DropdownMenuItem(value: 'color_grade', child: Text('Cor')),
+                          DropdownMenuItem(value: 'motion_graphics', child: Text('Motion')),
+                          DropdownMenuItem(value: 'audio_mix', child: Text('Áudio')),
+                          DropdownMenuItem(value: 'subtitles', child: Text('Legendas')),
+                          DropdownMenuItem(value: 'vfx', child: Text('VFX')),
+                          DropdownMenuItem(value: 'other', child: Text('Outro')),
+                        ],
+                        onChanged: (v) => setSheetState(() => selectedType = v!),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: selectedPriority,
+                        decoration: const InputDecoration(
+                          labelText: 'Prioridade',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'low', child: Text('Baixa')),
+                          DropdownMenuItem(value: 'medium', child: Text('Média')),
+                          DropdownMenuItem(value: 'high', child: Text('Alta')),
+                          DropdownMenuItem(value: 'urgent', child: Text('Urgente')),
+                        ],
+                        onChanged: (v) => setSheetState(() => selectedPriority = v!),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: ctx,
+                      initialDate: DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) setSheetState(() => selectedDate = date);
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Prazo (opcional)',
+                      border: OutlineInputBorder(),
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    child: Text(
+                      selectedDate != null
+                          ? DateFormat('dd/MM/yyyy').format(selectedDate!)
+                          : 'Selecionar data',
+                      style: TextStyle(
+                        color: selectedDate != null ? Colors.black : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final title = titleController.text.trim();
+                      if (title.isEmpty) return;
+                      final data = <String, dynamic>{
                         'title': title,
                         'description': descController.text.trim(),
                         'type': selectedType,
-                      },
-                    );
-                    if (job != null && ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Criar Job'),
+                        'priority': selectedPriority,
+                      };
+                      if (selectedDate != null) {
+                        data['due_date'] = selectedDate!.toIso8601String();
+                      }
+                      final job = await context.read<JobProvider>().createJob(
+                        _projectId!,
+                        data,
+                      );
+                      if (job != null && ctx.mounted) Navigator.pop(ctx);
+                    },
+                    child: const Text('Criar Job'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

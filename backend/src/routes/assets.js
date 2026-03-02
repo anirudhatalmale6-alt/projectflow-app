@@ -2,8 +2,75 @@ const express = require('express');
 const pool = require('../config/database');
 const auth = require('../middleware/auth');
 const { logAudit, getClientIp } = require('../utils/audit');
+const { upload } = require('../middleware/upload');
+const FileService = require('../services/fileService');
 
 const router = express.Router();
+
+// GET /api/v1/jobs/:jobId/assets - list assets for a job
+router.get('/jobs/:jobId/assets', auth, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT a.*, u.name as uploaded_by_name,
+              (SELECT COUNT(*) FROM asset_versions av WHERE av.asset_id = a.id) as version_count
+       FROM assets a
+       LEFT JOIN users u ON a.uploaded_by = u.id
+       WHERE a.job_id = $1
+       ORDER BY a.created_at DESC`,
+      [req.params.jobId]
+    );
+    res.json({ assets: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/jobs/:jobId/assets - upload asset to a job
+router.post('/jobs/:jobId/assets', auth, upload.single('file'), async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const { name, type } = req.body;
+
+    // Get job to find project_id
+    const { rows: jobRows } = await pool.query('SELECT project_id FROM jobs WHERE id = $1', [jobId]);
+    if (jobRows.length === 0) {
+      return res.status(404).json({ error: 'Job not found.' });
+    }
+    const projectId = jobRows[0].project_id;
+
+    let fileUrl = null;
+    let fileSize = null;
+    let mimeType = null;
+    let assetName = name;
+
+    if (req.file) {
+      const result = await FileService.upload(req.file.buffer, req.file.originalname, req.file.mimetype, projectId);
+      fileUrl = result.fileId;
+      fileSize = result.size || req.file.size;
+      mimeType = req.file.mimetype;
+      if (!assetName) assetName = req.file.originalname;
+    }
+
+    if (!assetName) {
+      return res.status(400).json({ error: 'Name or file is required.' });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO assets (project_id, job_id, name, type, mime_type, file_url, file_size, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [projectId, jobId, assetName, type || 'raw', mimeType, fileUrl, fileSize, req.user.id]
+    );
+
+    await logAudit({
+      userId: req.user.id, action: 'upload_asset', entityType: 'asset',
+      entityId: rows[0].id, details: { name: assetName, type: type || 'raw', job_id: jobId }, ipAddress: getClientIp(req),
+    });
+
+    res.status(201).json({ message: 'Asset uploaded.', asset: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /api/v1/projects/:projectId/assets
 router.get('/projects/:projectId/assets', auth, async (req, res, next) => {

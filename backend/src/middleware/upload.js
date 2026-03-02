@@ -5,22 +5,13 @@ const crypto = require('crypto');
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  // Allow video, image, audio, document files
-  const allowedMimes = [
-    'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska',
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-    'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/aac',
-    'application/pdf',
-    'application/zip', 'application/x-zip-compressed',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  ];
-
-  if (allowedMimes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
+  // Accept all common file types for video editing platform
+  // Only block potentially dangerous types
+  const blockedMimes = ['application/x-msdownload', 'application/x-executable'];
+  if (blockedMimes.includes(file.mimetype)) {
     cb(new Error(`File type ${file.mimetype} not allowed`), false);
+  } else {
+    cb(null, true);
   }
 };
 

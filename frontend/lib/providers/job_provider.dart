@@ -16,8 +16,8 @@ class JobProvider with ChangeNotifier {
 
   List<Job> get pendingJobs => _jobs.where((j) => j.status == 'pending').toList();
   List<Job> get inProgressJobs => _jobs.where((j) => j.status == 'in_progress').toList();
-  List<Job> get reviewJobs => _jobs.where((j) => j.status == 'review').toList();
-  List<Job> get doneJobs => _jobs.where((j) => j.status == 'done' || j.status == 'approved').toList();
+  List<Job> get reviewJobs => _jobs.where((j) => j.status == 'in_review' || j.status == 'revision').toList();
+  List<Job> get doneJobs => _jobs.where((j) => j.status == 'approved' || j.status == 'delivered').toList();
 
   Future<void> loadJobs(String projectId) async {
     _isLoading = true;

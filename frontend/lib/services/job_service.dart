@@ -17,7 +17,7 @@ class JobService {
   }
 
   Future<Job> updateJob(String id, Map<String, dynamic> body) async {
-    final data = await _api.patch(ApiConfig.jobById(id), body: body);
+    final data = await _api.put(ApiConfig.jobById(id), body: body);
     return Job.fromJson(data['job']);
   }
 

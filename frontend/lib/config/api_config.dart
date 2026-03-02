@@ -7,8 +7,8 @@ class ApiConfig {
       final origin = Uri.base.origin;
       return origin;
     }
-    // Mobile fallback
-    return 'https://armstrong-southampton-senior-exclusive.trycloudflare.com';
+    // Mobile fallback - direct server IP
+    return 'http://167.235.196.123:3001';
   }
 
   static const String apiPrefix = '/api/v1';
@@ -18,7 +18,7 @@ class ApiConfig {
       final origin = Uri.base.origin;
       return origin.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
     }
-    return 'wss://armstrong-southampton-senior-exclusive.trycloudflare.com';
+    return 'ws://167.235.196.123:3001';
   }
 
   // Auth

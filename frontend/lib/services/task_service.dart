@@ -31,7 +31,11 @@ class TaskService {
   }
 
   Future<Task> createTask(Map<String, dynamic> taskData) async {
-    final data = await _api.post(ApiConfig.tasks, body: taskData);
+    final projectId = taskData.remove('project_id') as String?;
+    if (projectId == null) {
+      throw ApiException(400, 'Project ID is required to create a task.');
+    }
+    final data = await _api.post(ApiConfig.tasksByProject(projectId), body: taskData);
     return Task.fromJson(data['task'] ?? data);
   }
 

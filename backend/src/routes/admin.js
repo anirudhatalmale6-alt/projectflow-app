@@ -253,4 +253,78 @@ router.get('/audit-log', async (req, res, next) => {
   }
 });
 
+// POST /api/v1/admin/users - create user (admin only)
+router.post('/users', async (req, res, next) => {
+  try {
+    const { name, email, password, role, phone } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Nome, email e senha são obrigatórios.' });
+    }
+
+    const validRoles = ['admin', 'manager', 'editor', 'freelancer', 'client'];
+    const userRole = role && validRoles.includes(role) ? role : 'editor';
+
+    const existing = await User.findByEmail(email.toLowerCase().trim());
+    if (existing) {
+      return res.status(409).json({ error: 'Este email já está cadastrado.' });
+    }
+
+    const user = await User.create({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password,
+      role: userRole,
+      phone: phone || null,
+    });
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'admin_create_user',
+      entityType: 'user',
+      entityId: user.id,
+      details: { name: user.name, email: user.email, role: user.role },
+      ipAddress: getClientIp(req),
+    });
+
+    res.status(201).json({ user });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/v1/admin/users/:id - delete user (admin only)
+router.delete('/users/:id', async (req, res, next) => {
+  try {
+    if (req.params.id === req.user.id) {
+      return res.status(400).json({ error: 'Você não pode excluir sua própria conta.' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    // Remove from project memberships
+    await pool.query('DELETE FROM project_members WHERE user_id = $1', [req.params.id]);
+    // Remove refresh tokens
+    await pool.query('DELETE FROM refresh_tokens WHERE user_id = $1', [req.params.id]);
+    // Delete user
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'admin_delete_user',
+      entityType: 'user',
+      entityId: req.params.id,
+      details: { name: user.name, email: user.email },
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({ message: 'Usuário excluído com sucesso.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

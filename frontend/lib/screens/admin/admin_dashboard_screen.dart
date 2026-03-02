@@ -328,9 +328,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  Map<String, dynamic> _listToMap(dynamic data, String keyField) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is List) {
+      final map = <String, dynamic>{};
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          map[item[keyField]?.toString() ?? ''] = item['count'] ?? 0;
+        }
+      }
+      return map;
+    }
+    return {};
+  }
+
   Widget _buildTasksChart() {
-    final tasksByStatus =
-        _stats?['tasks_by_status'] as Map<String, dynamic>? ?? {};
+    final tasksByStatus = _listToMap(_stats?['tasks_by_status'], 'status');
     final todo = (tasksByStatus['todo'] ?? 0).toDouble();
     final inProgress = (tasksByStatus['in_progress'] ?? 0).toDouble();
     final review = (tasksByStatus['review'] ?? 0).toDouble();
@@ -397,8 +410,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildUsersChart() {
-    final byRole =
-        _stats?['users_by_role'] as Map<String, dynamic>? ?? {};
+    final byRole = _listToMap(_stats?['users_by_role'], 'role');
     final entries = byRole.entries.toList();
 
     if (entries.isEmpty || entries.every((e) => (e.value ?? 0) == 0)) {

@@ -122,7 +122,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Future<void> _updateUserRole(String userId, String role) async {
     try {
-      await _api.put(ApiConfig.adminUserById(userId), body: {'role': role});
+      await _api.put('${ApiConfig.adminUserById(userId)}/role', body: {'role': role});
       _loadUsers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -179,6 +179,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gerenciar Usuarios'),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showCreateUser,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Novo Usuário'),
       ),
       body: Column(
         children: [
@@ -288,6 +293,133 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showCreateUser() {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    String selectedRole = 'editor';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Novo Usuário',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nome',
+                  prefixIcon: Icon(Icons.person_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: 'E-mail',
+                  prefixIcon: Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(
+                  labelText: 'Senha',
+                  prefixIcon: Icon(Icons.lock_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedRole,
+                decoration: const InputDecoration(
+                  labelText: 'Cargo',
+                  prefixIcon: Icon(Icons.badge_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'admin', child: Text('Administrador')),
+                  DropdownMenuItem(value: 'manager', child: Text('Gerente')),
+                  DropdownMenuItem(value: 'editor', child: Text('Editor')),
+                  DropdownMenuItem(value: 'freelancer', child: Text('Freelancer')),
+                  DropdownMenuItem(value: 'client', child: Text('Cliente')),
+                ],
+                onChanged: (v) => setSheetState(() => selectedRole = v!),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    final email = emailController.text.trim();
+                    final password = passwordController.text;
+                    if (name.isEmpty || email.isEmpty || password.length < 6) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(content: Text('Preencha todos os campos (senha mín. 6 caracteres)')),
+                      );
+                      return;
+                    }
+                    try {
+                      await _api.post(ApiConfig.adminUsers, body: {
+                        'name': name,
+                        'email': email,
+                        'password': password,
+                        'role': selectedRole,
+                      });
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      _loadUsers();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Usuário criado com sucesso'),
+                            backgroundColor: AppTheme.successColor,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text('Erro: $e'),
+                            backgroundColor: AppTheme.errorColor,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Criar Usuário'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

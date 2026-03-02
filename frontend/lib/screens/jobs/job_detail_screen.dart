@@ -633,6 +633,22 @@ class _JobDetailScreenState extends State<JobDetailScreen>
     );
   }
 
+  String? _findFirstVideoUrl() {
+    const videoExts = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
+    for (final asset in _assets) {
+      final name = (asset['name'] ?? '').toString().toLowerCase();
+      final fileUrl = asset['file_url'] as String?;
+      if (fileUrl != null && videoExts.any((ext) => name.endsWith(ext))) {
+        return fileUrl;
+      }
+    }
+    // Fallback: return first asset's file_url if any
+    if (_assets.isNotEmpty) {
+      return _assets.first['file_url'] as String?;
+    }
+    return null;
+  }
+
   Widget _buildReviewCard(Map<String, dynamic> review) {
     final status = review['status'] ?? 'pending';
     final summary = review['summary'] ?? 'Sem resumo';
@@ -659,44 +675,59 @@ class _JobDetailScreenState extends State<JobDetailScreen>
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: color.withOpacity(0.1),
-                  child: Icon(Icons.person, size: 18, color: color),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(reviewerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      Text(createdAt, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-                    ],
-                  ),
-                ),
-                _buildMiniTag(statusLabels[status] ?? status, color),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(summary, style: const TextStyle(fontSize: 14, height: 1.4)),
-            if (commentCount > 0) ...[
-              const SizedBox(height: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          Navigator.pushNamed(context, '/reviews/player', arguments: {
+            'reviewId': review['id']?.toString() ?? '',
+            'jobId': _jobId,
+            'videoUrl': _findFirstVideoUrl(),
+            'assetName': _job?.title ?? 'Review',
+          });
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
                 children: [
-                  Icon(Icons.comment_outlined, size: 14, color: Colors.grey[500]),
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: color.withOpacity(0.1),
+                    child: Icon(Icons.person, size: 18, color: color),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(reviewerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        Text(createdAt, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                      ],
+                    ),
+                  ),
+                  _buildMiniTag(statusLabels[status] ?? status, color),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(summary, style: const TextStyle(fontSize: 14, height: 1.4)),
+              Row(
+                children: [
+                  if (commentCount > 0) ...[
+                    Icon(Icons.comment_outlined, size: 14, color: Colors.grey[500]),
+                    const SizedBox(width: 4),
+                    Text('$commentCount comentários', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    const SizedBox(width: 12),
+                  ],
+                  const Spacer(),
+                  Icon(Icons.play_circle_outline, size: 16, color: AppTheme.primaryColor),
                   const SizedBox(width: 4),
-                  Text('$commentCount comentários', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  Text('Abrir Player', style: TextStyle(fontSize: 12, color: AppTheme.primaryColor, fontWeight: FontWeight.w500)),
                 ],
               ),
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -8,6 +8,9 @@ import 'providers/project_provider.dart';
 import 'providers/task_provider.dart';
 import 'providers/delivery_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/chat_provider.dart';
+import 'providers/job_provider.dart';
+import 'providers/calendar_provider.dart';
 
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -28,6 +31,11 @@ import 'screens/notifications/notifications_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/admin_users_screen.dart';
+import 'screens/chat/chat_channels_screen.dart';
+import 'screens/chat/chat_messages_screen.dart';
+import 'screens/jobs/jobs_list_screen.dart';
+import 'screens/jobs/job_detail_screen.dart';
+import 'screens/calendar/calendar_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +59,9 @@ class DuozzFlowApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => TaskProvider()),
         ChangeNotifierProvider(create: (_) => DeliveryProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => JobProvider()),
+        ChangeNotifierProvider(create: (_) => CalendarProvider()),
       ],
       child: MaterialApp(
         title: 'Duozz Flow',
@@ -77,6 +88,11 @@ class DuozzFlowApp extends StatelessWidget {
           '/profile': (context) => const ProfileScreen(),
           '/admin': (context) => const AdminDashboardScreen(),
           '/admin/users': (context) => const AdminUsersScreen(),
+          '/chat': (context) => const ChatChannelsScreen(),
+          '/chat/messages': (context) => const ChatMessagesScreen(),
+          '/jobs': (context) => const JobsListScreen(),
+          '/jobs/detail': (context) => const JobDetailScreen(),
+          '/calendar': (context) => const CalendarScreen(),
         },
       ),
     );

@@ -13,6 +13,8 @@ import '../../widgets/delivery_card.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/role_badge.dart';
+import '../../providers/job_provider.dart';
+import '../../models/job.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
   const ProjectDetailScreen({super.key});
@@ -29,7 +31,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -46,6 +48,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     context.read<ProjectProvider>().loadProject(_projectId!);
     context.read<TaskProvider>().loadTasks(projectId: _projectId);
     context.read<DeliveryProvider>().loadDeliveries(projectId: _projectId);
+    context.read<JobProvider>().loadJobs(_projectId!);
   }
 
   @override
@@ -231,11 +234,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               delegate: _SliverTabBarDelegate(
                 TabBar(
                   controller: _tabController,
+                  isScrollable: true,
                   tabs: const [
                     Tab(text: 'Tarefas'),
+                    Tab(text: 'Jobs'),
                     Tab(text: 'Entregas'),
+                    Tab(text: 'Chat'),
                     Tab(text: 'Equipe'),
-                    Tab(text: 'Atividade'),
+                    Tab(text: 'Calendário'),
                   ],
                 ),
               ),
@@ -246,9 +252,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           controller: _tabController,
           children: [
             _buildTasksTab(auth),
+            _buildJobsTab(auth),
             _buildDeliveriesTab(auth),
+            _buildChatTab(),
             _buildTeamTab(),
-            _buildActivityTab(),
+            _buildCalendarTab(),
           ],
         ),
       ),
@@ -432,12 +440,138 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     );
   }
 
-  Widget _buildActivityTab() {
-    return const EmptyState(
-      icon: Icons.history,
-      title: 'Atividade recente',
-      subtitle: 'O historico de atividades aparecera aqui',
+  Widget _buildJobsTab(AuthProvider auth) {
+    final jobProvider = context.watch<JobProvider>();
+
+    if (jobProvider.isLoading) {
+      return const LoadingWidget();
+    }
+
+    if (jobProvider.jobs.isEmpty) {
+      return EmptyState(
+        icon: Icons.work_outline,
+        title: 'Nenhum job',
+        subtitle: 'Adicione jobs de edição ao projeto',
+        actionLabel: auth.canManageProjects ? 'Ver Jobs' : null,
+        onAction: auth.canManageProjects
+            ? () => Navigator.pushNamed(context, '/jobs', arguments: _projectId)
+            : null,
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () => Navigator.pushNamed(context, '/jobs', arguments: _projectId),
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: const Text('Ver Todos'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: jobProvider.jobs.length,
+            itemBuilder: (context, index) {
+              final job = jobProvider.jobs[index];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: _getJobTypeColor(job.type).withAlpha(25),
+                    child: Text(
+                      Job.typeLabel(job.type).substring(0, 1),
+                      style: TextStyle(
+                        color: _getJobTypeColor(job.type),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  title: Text(job.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(Job.statusLabel(job.status)),
+                  trailing: job.assigneeName != null
+                      ? Chip(label: Text(job.assigneeName!, style: const TextStyle(fontSize: 11)))
+                      : null,
+                  onTap: () => Navigator.pushNamed(context, '/jobs/detail', arguments: job.id),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
+  }
+
+  Widget _buildChatTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          const Text(
+            'Chat do Projeto',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Converse com a equipe em tempo real',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pushNamed(context, '/chat', arguments: _projectId),
+            icon: const Icon(Icons.chat),
+            label: const Text('Abrir Chat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.calendar_month, size: 64, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          const Text(
+            'Calendário do Projeto',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Prazos, reuniões e marcos',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pushNamed(context, '/calendar', arguments: _projectId),
+            icon: const Icon(Icons.calendar_today),
+            label: const Text('Abrir Calendário'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getJobTypeColor(String type) {
+    switch (type) {
+      case 'edit': return const Color(0xFF2563EB);
+      case 'color_grade': return const Color(0xFF7C3AED);
+      case 'motion_graphics': return const Color(0xFFEC4899);
+      case 'audio_mix': return const Color(0xFF14B8A6);
+      case 'subtitles': return const Color(0xFFF59E0B);
+      case 'vfx': return const Color(0xFFEF4444);
+      default: return Colors.grey;
+    }
   }
 
   void _confirmDelete(Project project) {

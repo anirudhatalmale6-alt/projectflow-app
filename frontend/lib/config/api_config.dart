@@ -74,6 +74,35 @@ class ApiConfig {
       '$apiPrefix/notifications/$id/read';
   static const String notificationsReadAll = '$apiPrefix/notifications/read-all';
 
+  // Jobs
+  static String jobsByProject(String projectId) =>
+      '$apiPrefix/projects/$projectId/jobs';
+  static String jobById(String id) => '$apiPrefix/jobs/$id';
+  static String jobStatus(String id) => '$apiPrefix/jobs/$id/status';
+
+  // Assets
+  static String assetsByJob(String jobId) => '$apiPrefix/jobs/$jobId/assets';
+  static String assetById(String id) => '$apiPrefix/assets/$id';
+  static String assetVersions(String id) => '$apiPrefix/assets/$id/versions';
+
+  // Reviews
+  static String reviewsByJob(String jobId) =>
+      '$apiPrefix/jobs/$jobId/reviews';
+  static String reviewById(String id) => '$apiPrefix/reviews/$id';
+  static String reviewComments(String id) => '$apiPrefix/reviews/$id/comments';
+
+  // Chat
+  static String chatChannels(String projectId) =>
+      '$apiPrefix/projects/$projectId/channels';
+  static String channelMessages(String channelId) =>
+      '$apiPrefix/channels/$channelId/messages';
+
+  // Calendar
+  static String calendarEvents(String projectId) =>
+      '$apiPrefix/projects/$projectId/calendar/events';
+  static String calendarEventById(String id) =>
+      '$apiPrefix/calendar/events/$id';
+
   // Admin
   static const String adminUsers = '$apiPrefix/admin/users';
   static String adminUserById(String id) => '$apiPrefix/admin/users/$id';

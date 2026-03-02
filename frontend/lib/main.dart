@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'config/api_config.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/project_provider.dart';
@@ -28,8 +29,9 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/admin_users_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ApiConfig.loadConfig();
   runApp(const DuozzFlowApp());
 }
 

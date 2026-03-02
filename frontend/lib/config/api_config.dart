@@ -1,14 +1,32 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
+  static String? _customBaseUrl;
+  static const String _defaultBaseUrl = 'https://hopefully-conferencing-copy-sells.trycloudflare.com';
+
+  static Future<void> loadConfig() async {
+    if (kIsWeb) return;
+    final prefs = await SharedPreferences.getInstance();
+    _customBaseUrl = prefs.getString('server_url');
+  }
+
+  static Future<void> setServerUrl(String url) async {
+    // Remove trailing slash
+    url = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    _customBaseUrl = url;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('server_url', url);
+  }
+
+  static bool get hasCustomUrl => _customBaseUrl != null && _customBaseUrl!.isNotEmpty;
+
   static String get baseUrl {
     if (kIsWeb) {
-      // On web, use the current page origin (same-origin requests)
       final origin = Uri.base.origin;
       return origin;
     }
-    // Mobile fallback - direct server IP
-    return 'http://167.235.196.123:3001';
+    return _customBaseUrl ?? _defaultBaseUrl;
   }
 
   static const String apiPrefix = '/api/v1';
@@ -18,7 +36,8 @@ class ApiConfig {
       final origin = Uri.base.origin;
       return origin.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
     }
-    return 'ws://167.235.196.123:3001';
+    final base = _customBaseUrl ?? _defaultBaseUrl;
+    return base.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
   }
 
   // Auth

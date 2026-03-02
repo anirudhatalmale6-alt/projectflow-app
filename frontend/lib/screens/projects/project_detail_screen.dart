@@ -32,6 +32,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {}); // Rebuild to update FAB
+      }
+    });
   }
 
   @override
@@ -71,6 +76,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     }
 
     return Scaffold(
+      floatingActionButton: _buildFab(auth),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
@@ -261,6 +267,28 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         ),
       ),
     );
+  }
+
+  Widget? _buildFab(AuthProvider auth) {
+    // Show FAB based on active tab
+    if (_tabController.index == 0 && auth.canAssignTasks) {
+      // Tarefas tab
+      return FloatingActionButton.extended(
+        onPressed: () => Navigator.pushNamed(context, '/tasks/create',
+            arguments: _projectId),
+        icon: const Icon(Icons.add),
+        label: const Text('Nova Tarefa'),
+      );
+    } else if (_tabController.index == 1 && auth.canManageProjects) {
+      // Jobs tab
+      return FloatingActionButton.extended(
+        onPressed: () => Navigator.pushNamed(context, '/jobs',
+            arguments: _projectId),
+        icon: const Icon(Icons.work_outline),
+        label: const Text('Ver Jobs'),
+      );
+    }
+    return null;
   }
 
   Widget _buildStatsRow(Project project) {

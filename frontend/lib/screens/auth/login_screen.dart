@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/web_helper.dart' if (dart.library.html) '../../utils/web_helper_web.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,6 +19,46 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _googleLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkGoogleCallback();
+  }
+
+  /// Check if we arrived here from a Google OAuth callback (web redirect)
+  Future<void> _checkGoogleCallback() async {
+    if (!kIsWeb) return;
+
+    final uri = Uri.base;
+    final accessToken = uri.queryParameters['access_token'];
+    final refreshToken = uri.queryParameters['refresh_token'];
+    final error = uri.queryParameters['error'];
+
+    // Clean the URL to remove tokens from browser history
+    if (accessToken != null || error != null) {
+      final cleanPath = uri.path.isEmpty ? '/' : uri.path;
+      replaceCurrentUrl('${uri.origin}$cleanPath');
+    }
+
+    if (error != null) {
+      return;
+    }
+
+    if (accessToken != null && refreshToken != null) {
+      setState(() => _googleLoading = true);
+
+      final auth = context.read<AuthProvider>();
+      final success = await auth.loginWithTokens(accessToken, refreshToken);
+
+      if (success && mounted) {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else if (mounted) {
+        setState(() => _googleLoading = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -37,8 +81,51 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _loginWithGoogle() {
+    final googleUrl = '${ApiConfig.baseUrl}${ApiConfig.googleAuth}';
+
+    if (kIsWeb) {
+      // On web, redirect in same tab to Google OAuth
+      navigateToUrl(googleUrl);
+    } else {
+      // On mobile, open in external browser
+      launchUrl(
+        Uri.parse(googleUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_googleLoading) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/images/logo_orange.png',
+                width: 120,
+                height: 80,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 32),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text(
+                'Entrando com Google...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -47,7 +134,6 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 48),
-              // Real DUOZZ Logo
               Center(
                 child: Image.asset(
                   'assets/images/logo_orange.png',
@@ -73,7 +159,82 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: AppTheme.textSecondary,
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
+              // Google Login Button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: _loginWithGoogle,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.textPrimary,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'G',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              foreground: Paint()
+                                ..shader = const LinearGradient(
+                                  colors: [
+                                    Color(0xFF4285F4),
+                                    Color(0xFF34A853),
+                                    Color(0xFFFBBC05),
+                                    Color(0xFFEA4335),
+                                  ],
+                                ).createShader(
+                                  const Rect.fromLTWH(0, 0, 24, 24),
+                                ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Entrar com Google',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Divider
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'ou',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                ],
+              ),
+              const SizedBox(height: 24),
               Consumer<AuthProvider>(
                 builder: (context, auth, _) {
                   if (auth.errorMessage != null) {

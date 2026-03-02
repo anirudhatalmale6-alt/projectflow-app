@@ -73,6 +73,26 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> loginWithTokens(String accessToken, String refreshToken) async {
+    _state = AuthState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiService.saveTokens(accessToken, refreshToken);
+      _user = await _authService.me();
+      _state = AuthState.authenticated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _state = AuthState.error;
+      _errorMessage = _parseError(e);
+      await _apiService.clearTokens();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> register({
     required String name,
     required String email,

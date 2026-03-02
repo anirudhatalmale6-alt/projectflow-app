@@ -32,6 +32,7 @@ class ApiConfig {
   static const String logout = '$apiPrefix/auth/logout';
   static const String me = '$apiPrefix/auth/me';
   static const String updateProfile = '$apiPrefix/auth/profile';
+  static const String googleAuth = '$apiPrefix/auth/google';
 
   // Clients
   static const String clients = '$apiPrefix/clients';

@@ -20,3 +20,4 @@ frontend/*.iml
 # OS
 .DS_Store
 Thumbs.db
+pgdata/

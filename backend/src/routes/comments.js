@@ -250,4 +250,34 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+// DELETE /api/v1/comments/:id - delete a comment
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const comment = await Comment.findById(req.params.id);
+    if (!comment) {
+      return res.status(404).json({ error: 'Comment not found.' });
+    }
+
+    // Only the comment author or admin can delete
+    if (comment.user_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only the comment author can delete this comment.' });
+    }
+
+    await Comment.delete(req.params.id);
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'delete',
+      entityType: 'comment',
+      entityId: req.params.id,
+      details: { content_preview: (comment.content || '').substring(0, 100) },
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({ message: 'Comment deleted.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

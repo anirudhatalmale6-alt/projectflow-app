@@ -356,8 +356,116 @@ router.delete('/tasks/:id', async (req, res, next) => {
   }
 });
 
-// PUT /api/v1/tasks/:id/position - update kanban position
-router.put('/tasks/:id/position', async (req, res, next) => {
+// GET /api/v1/tasks - list all tasks for the current user
+router.get('/tasks', async (req, res, next) => {
+  try {
+    const { status, priority, search } = req.query;
+    const tasks = await Task.findByAssignee(req.user.id, { status, priority });
+    res.json({ tasks });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/v1/tasks/:id/status - quick status update
+router.patch('/tasks/:id/status', async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found.' });
+    }
+
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+      const membership = await Project.isMember(task.project_id, req.user.id);
+      if (!membership) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+    }
+
+    const { status } = req.body;
+    if (!status || !['todo', 'in_progress', 'review', 'done'].includes(status)) {
+      return res.status(400).json({ error: 'Valid status is required.' });
+    }
+
+    const updated = await Task.update(req.params.id, { status });
+
+    // Notify on status change
+    if (status !== task.status) {
+      const notifyUserIds = new Set();
+      if (task.assignee_id && task.assignee_id !== req.user.id) notifyUserIds.add(task.assignee_id);
+      if (task.reporter_id && task.reporter_id !== req.user.id) notifyUserIds.add(task.reporter_id);
+
+      const notifications = [];
+      for (const uid of notifyUserIds) {
+        notifications.push({
+          userId: uid,
+          type: 'task_updated',
+          title: `Task status changed: "${updated.title}"`,
+          message: `${req.user.name} changed status from "${task.status}" to "${status}".`,
+          referenceId: updated.id,
+          referenceType: 'task',
+        });
+      }
+      if (notifications.length > 0) {
+        await Notification.createBulk(notifications);
+        const io = req.app.get('io');
+        if (io) {
+          for (const uid of notifyUserIds) {
+            io.to(`user:${uid}`).emit('notification', {
+              type: 'task_updated',
+              task_id: updated.id,
+            });
+          }
+        }
+      }
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project:${task.project_id}`).emit('task_updated', updated);
+    }
+
+    res.json({ task: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/v1/tasks/:id/hours - update actual hours
+router.patch('/tasks/:id/hours', async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found.' });
+    }
+
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+      const membership = await Project.isMember(task.project_id, req.user.id);
+      if (!membership) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+    }
+
+    const actualHours = req.body.actual_hours ?? req.body.actualHours;
+    if (actualHours === undefined || actualHours === null) {
+      return res.status(400).json({ error: 'actual_hours is required.' });
+    }
+
+    const updated = await Task.update(req.params.id, { actual_hours: parseFloat(actualHours) || 0 });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project:${task.project_id}`).emit('task_updated', updated);
+    }
+
+    res.json({ task: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT|PATCH /api/v1/tasks/:id/position - update kanban position
+const positionHandler = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) {
@@ -408,6 +516,8 @@ router.put('/tasks/:id/position', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+};
+router.put('/tasks/:id/position', positionHandler);
+router.patch('/tasks/:id/position', positionHandler);
 
 module.exports = router;

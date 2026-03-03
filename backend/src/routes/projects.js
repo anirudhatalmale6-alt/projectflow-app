@@ -207,6 +207,20 @@ router.delete('/:id', auth, async (req, res, next) => {
   }
 });
 
+// GET /api/v1/projects/:id/members - list project members
+router.get('/:id/members', requireProjectAccess(), async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found.' });
+    }
+    const members = await Project.getMembers(req.params.id);
+    res.json({ members });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/v1/projects/:id/members - add member
 // Only admin, global manager, or project manager
 router.post('/:id/members', requireProjectManager(), async (req, res, next) => {

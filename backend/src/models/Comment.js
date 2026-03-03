@@ -53,6 +53,14 @@ const Comment = {
     );
     return rows[0].count;
   },
+
+  async delete(id) {
+    const { rows } = await pool.query(
+      'DELETE FROM comments WHERE id = $1 RETURNING *',
+      [id]
+    );
+    return rows[0] || null;
+  },
 };
 
 module.exports = Comment;

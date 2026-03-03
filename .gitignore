@@ -21,3 +21,4 @@ frontend/*.iml
 .DS_Store
 Thumbs.db
 pgdata/
+backend/uploads/

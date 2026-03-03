@@ -552,7 +552,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                     onTap: () => Navigator.pushNamed(
                                       context,
                                       '/deliveries/detail',
-                                      arguments: d['id'],
+                                      arguments: d['id']?.toString(),
                                     ),
                                     child: ListTile(
                                     leading: Container(

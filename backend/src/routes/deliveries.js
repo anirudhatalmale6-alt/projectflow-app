@@ -409,6 +409,10 @@ router.delete('/deliveries/:id', async (req, res, next) => {
       if (!membership) {
         return res.status(403).json({ error: 'Access denied.' });
       }
+      // Approved files can only be deleted by admin or manager
+      if (delivery.status === 'approved' && membership.role !== 'manager') {
+        return res.status(403).json({ error: 'Approved files can only be deleted by administrators or managers.' });
+      }
       if (membership.role !== 'manager' && delivery.uploaded_by !== req.user.id) {
         return res.status(403).json({ error: 'Only the uploader or a manager can delete this file.' });
       }

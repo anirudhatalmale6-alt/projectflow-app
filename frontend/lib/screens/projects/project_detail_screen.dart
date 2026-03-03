@@ -238,48 +238,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             if (project.description != null &&
                 project.description!.isNotEmpty)
               SliverToBoxAdapter(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.dividerColor),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.description_outlined,
-                                size: 16, color: AppTheme.textSecondary),
-                            SizedBox(width: 6),
-                            Text(
-                              'Descrição',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          project.description!,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.textPrimary,
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                child: _ExpandableDescription(description: project.description!),
               ),
             SliverPersistentHeader(
               pinned: true,
@@ -704,6 +663,84 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             child: const Text('Excluir'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ExpandableDescription extends StatefulWidget {
+  final String description;
+  const _ExpandableDescription({required this.description});
+
+  @override
+  State<_ExpandableDescription> createState() => _ExpandableDescriptionState();
+}
+
+class _ExpandableDescriptionState extends State<_ExpandableDescription> {
+  bool _expanded = false;
+  static const int _maxChars = 200;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLong = widget.description.length > _maxChars;
+    final displayText = (!_expanded && isLong)
+        ? '${widget.description.substring(0, _maxChars)}...'
+        : widget.description;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.dividerColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.description_outlined,
+                    size: 16, color: AppTheme.textSecondary),
+                SizedBox(width: 6),
+                Text(
+                  'Descrição',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              displayText,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppTheme.textPrimary,
+                height: 1.5,
+              ),
+            ),
+            if (isLong)
+              GestureDetector(
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    _expanded ? 'Ver menos' : 'Ver mais',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -162,6 +162,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     context.read<TaskProvider>().updateTaskStatus(_taskId!, newStatus);
   }
 
+  bool _canDeleteDelivery(Map<String, dynamic> d, AuthProvider auth) {
+    final isApproved = d['status'] == 'approved';
+    final isUploader = d['uploaded_by'] == auth.user?.id;
+    final isManagerOrAdmin = auth.canManageProjects;
+    // Approved files: only admin/manager can delete
+    if (isApproved) return isManagerOrAdmin;
+    // Non-approved files: uploader or admin/manager
+    return isUploader || isManagerOrAdmin;
+  }
+
   Future<void> _deleteDelivery(String deliveryId, String title) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -747,8 +757,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                       children: [
                                         Icon(Icons.comment_outlined, size: 16, color: Colors.grey[400]),
                                         const SizedBox(width: 2),
-                                        if (d['uploaded_by'] == context.read<AuthProvider>().user?.id ||
-                                            context.read<AuthProvider>().canManageProjects)
+                                        if (_canDeleteDelivery(d, context.read<AuthProvider>()))
                                           InkWell(
                                             onTap: () => _deleteDelivery(
                                               d['id']?.toString() ?? '',

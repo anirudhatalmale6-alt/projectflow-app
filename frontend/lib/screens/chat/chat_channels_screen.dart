@@ -73,9 +73,33 @@ class _ChatChannelsScreenState extends State<ChatChannelsScreen> {
       ),
       body: (_initializing || chatProvider.isLoading)
           ? const Center(child: CircularProgressIndicator())
-          : chatProvider.channels.isEmpty
-              ? _buildEmpty()
-              : RefreshIndicator(
+          : chatProvider.errorMessage != null && chatProvider.channels.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 12),
+                      Text(
+                        chatProvider.errorMessage!,
+                        style: TextStyle(color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          chatProvider.clearError();
+                          _initChat();
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                )
+              : chatProvider.channels.isEmpty
+                  ? _buildEmpty()
+                  : RefreshIndicator(
                   onRefresh: () => chatProvider.loadChannels(_projectId!),
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),

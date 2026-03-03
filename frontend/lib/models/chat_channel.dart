@@ -19,6 +19,13 @@ class ChatChannel {
     this.createdAt,
   });
 
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
   factory ChatChannel.fromJson(Map<String, dynamic> json) {
     return ChatChannel(
       id: json['id'].toString(),
@@ -26,7 +33,7 @@ class ChatChannel {
       name: json['name'] ?? 'Geral',
       type: json['type'] ?? 'project',
       jobId: json['job_id']?.toString(),
-      messageCount: json['message_count'] ?? 0,
+      messageCount: _parseInt(json['message_count']),
       lastMessage: json['last_message'],
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])

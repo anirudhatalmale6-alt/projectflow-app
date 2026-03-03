@@ -9,7 +9,7 @@ router.get('/projects/:projectId/channels', auth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
       `SELECT cc.*,
-              (SELECT COUNT(*) FROM chat_messages cm WHERE cm.channel_id = cc.id) as message_count,
+              (SELECT COUNT(*)::int FROM chat_messages cm WHERE cm.channel_id = cc.id) as message_count,
               (SELECT cm.content FROM chat_messages cm WHERE cm.channel_id = cc.id ORDER BY cm.created_at DESC LIMIT 1) as last_message
        FROM chat_channels cc
        WHERE cc.project_id = $1
@@ -26,11 +26,22 @@ router.get('/projects/:projectId/channels', auth, async (req, res, next) => {
 router.post('/projects/:projectId/channels', auth, async (req, res, next) => {
   try {
     const { name, type, job_id } = req.body;
+    const channelName = name || 'Geral';
+    const channelType = type || 'project';
+
+    // Prevent duplicate channels with the same name in the same project
+    const existing = await pool.query(
+      'SELECT * FROM chat_channels WHERE project_id = $1 AND name = $2 AND type = $3 LIMIT 1',
+      [req.params.projectId, channelName, channelType]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(200).json({ message: 'Channel already exists.', channel: existing.rows[0] });
+    }
 
     const { rows } = await pool.query(
       `INSERT INTO chat_channels (project_id, name, type, job_id)
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.params.projectId, name || 'Geral', type || 'project', job_id || null]
+      [req.params.projectId, channelName, channelType, job_id || null]
     );
 
     res.status(201).json({ message: 'Channel created.', channel: rows[0] });

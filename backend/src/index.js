@@ -183,9 +183,16 @@ const path = require('path');
 const uploadsDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
 app.use('/uploads', express.static(uploadsDir));
 
-// Serve Flutter web frontend
+// Serve Flutter web frontend (no-cache for development)
 const publicDir = path.join(__dirname, '..', 'public');
-app.use(express.static(publicDir));
+app.use(express.static(publicDir, {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+  }
+}));
 
 // SPA fallback - serve index.html for non-API routes
 app.use((req, res, next) => {

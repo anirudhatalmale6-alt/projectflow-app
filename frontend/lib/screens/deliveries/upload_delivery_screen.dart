@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../config/theme.dart';
+import '../../config/api_config.dart';
 import '../../providers/delivery_provider.dart';
+import '../../services/api_service.dart';
+import '../../models/delivery_job.dart';
 import '../../widgets/loading_widget.dart';
 
 class UploadDeliveryScreen extends StatefulWidget {
@@ -19,8 +23,8 @@ class _UploadDeliveryScreenState extends State<UploadDeliveryScreen> {
 
   String _format = 'mp4';
   String? _projectId;
-  String? _selectedFilePath;
-  String? _selectedFileName;
+  PlatformFile? _selectedFile;
+  bool _uploading = false;
 
   static const _formats = [
     'mp4',
@@ -59,59 +63,95 @@ class _UploadDeliveryScreenState extends State<UploadDeliveryScreen> {
     super.dispose();
   }
 
-  void _selectFile() {
-    // File picker placeholder
-    setState(() {
-      _selectedFileName = 'video_final_v1.mp4';
-      _selectedFilePath = '/tmp/video_final_v1.mp4';
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Selecao de arquivo (placeholder) - Arquivo simulado selecionado'),
-        duration: Duration(seconds: 2),
-      ),
+  Future<void> _selectFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true,
     );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() {
+        _selectedFile = result.files.first;
+        // Auto-detect format from extension
+        final ext = _selectedFile!.extension?.toLowerCase() ?? '';
+        if (_formats.contains(ext)) {
+          _format = ext;
+        }
+      });
+    }
   }
 
   Future<void> _upload() async {
     if (!_formKey.currentState!.validate()) return;
-
-    final provider = context.read<DeliveryProvider>();
-    final data = {
-      if (_projectId != null) 'project_id': _projectId,
-      'title': _titleController.text.trim(),
-      'description': _descriptionController.text.trim(),
-      'format': _format,
-      'status': 'uploaded',
-    };
-
-    final delivery = await provider.createDelivery(
-      data,
-      filePath: _selectedFilePath,
-    );
-
-    if (delivery != null && mounted) {
-      Navigator.pop(context);
+    if (_projectId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Entrega enviada com sucesso!'),
-          backgroundColor: AppTheme.successColor,
-        ),
+        const SnackBar(content: Text('Projeto não encontrado.'), backgroundColor: Colors.red),
       );
+      return;
     }
+
+    setState(() => _uploading = true);
+
+    try {
+      final api = ApiService();
+      final fields = {
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'format': _format,
+      };
+
+      Map<String, dynamic> data;
+      if (_selectedFile != null && _selectedFile!.bytes != null) {
+        data = await api.multipartPostBytes(
+          ApiConfig.deliveriesByProject(_projectId!),
+          fields: fields,
+          fileBytes: _selectedFile!.bytes!,
+          fileName: _selectedFile!.name,
+          fileField: 'file',
+        );
+      } else {
+        data = await api.post(
+          ApiConfig.deliveriesByProject(_projectId!),
+          body: {...fields, 'project_id': _projectId},
+        );
+      }
+
+      if (mounted) {
+        // Reload deliveries
+        context.read<DeliveryProvider>().loadDeliveries(projectId: _projectId);
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Entrega enviada com sucesso!'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+
+    if (mounted) setState(() => _uploading = false);
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   @override
   Widget build(BuildContext context) {
-    final deliveryProvider = context.watch<DeliveryProvider>();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nova Entrega'),
       ),
       body: LoadingOverlay(
-        isLoading: deliveryProvider.isLoading,
+        isLoading: _uploading,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Form(
@@ -133,7 +173,7 @@ class _UploadDeliveryScreenState extends State<UploadDeliveryScreen> {
                         style: BorderStyle.solid,
                       ),
                     ),
-                    child: _selectedFileName != null
+                    child: _selectedFile != null
                         ? Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -144,13 +184,21 @@ class _UploadDeliveryScreenState extends State<UploadDeliveryScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                _selectedFileName!,
+                                _selectedFile!.name,
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: AppTheme.textPrimary,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
+                              if (_selectedFile!.size > 0) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  _formatSize(_selectedFile!.size),
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
                               const SizedBox(height: 4),
                               TextButton(
                                 onPressed: _selectFile,
@@ -243,11 +291,13 @@ class _UploadDeliveryScreenState extends State<UploadDeliveryScreen> {
                 SizedBox(
                   height: 52,
                   child: ElevatedButton.icon(
-                    onPressed: _upload,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text(
-                      'Enviar Entrega',
-                      style: TextStyle(fontSize: 16),
+                    onPressed: _uploading ? null : _upload,
+                    icon: _uploading
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.upload_file),
+                    label: Text(
+                      _uploading ? 'Enviando...' : 'Enviar Entrega',
+                      style: const TextStyle(fontSize: 16),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.secondaryColor,

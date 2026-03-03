@@ -15,6 +15,7 @@ class ProjectProvider with ChangeNotifier {
   Project? _currentProject;
   List<User> _currentMembers = [];
   bool _isLoading = false;
+  bool _loadingProject = false;
   String? _errorMessage;
 
   List<Project> get projects => _projects;
@@ -22,6 +23,7 @@ class ProjectProvider with ChangeNotifier {
   Project? get currentProject => _currentProject;
   List<User> get currentMembers => _currentMembers;
   bool get isLoading => _isLoading;
+  bool get loadingProject => _loadingProject;
   String? get errorMessage => _errorMessage;
 
   Future<void> loadProjects({String? status, String? search}) async {
@@ -42,7 +44,7 @@ class ProjectProvider with ChangeNotifier {
   }
 
   Future<void> loadProject(String id) async {
-    _isLoading = true;
+    _loadingProject = true;
     _errorMessage = null;
     notifyListeners();
 
@@ -52,7 +54,7 @@ class ProjectProvider with ChangeNotifier {
     } catch (e) {
       _errorMessage = _parseError(e);
     }
-    _isLoading = false;
+    _loadingProject = false;
     notifyListeners();
   }
 

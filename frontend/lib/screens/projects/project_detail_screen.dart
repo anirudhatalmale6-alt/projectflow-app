@@ -71,7 +71,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final project = projectProvider.currentProject;
     final auth = context.watch<AuthProvider>();
 
-    if (projectProvider.isLoading) {
+    if (projectProvider.loadingProject) {
       return Scaffold(
         appBar: AppBar(),
         body: const LoadingWidget(message: 'Carregando projeto...'),

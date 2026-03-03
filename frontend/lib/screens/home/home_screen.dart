@@ -9,6 +9,7 @@ import '../tasks/task_board_screen.dart';
 import '../deliveries/deliveries_list_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
+import '../admin/admin_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,10 +51,10 @@ class _HomeScreenState extends State<HomeScreen> {
           screen: const TaskBoardScreen(),
         ),
         _NavItem(
-          icon: Icons.video_file_outlined,
-          activeIcon: Icons.video_file,
-          label: 'Entregas',
-          screen: const DeliveriesListScreen(),
+          icon: Icons.admin_panel_settings_outlined,
+          activeIcon: Icons.admin_panel_settings,
+          label: 'Admin',
+          screen: const AdminDashboardScreen(),
         ),
         _NavItem(
           icon: Icons.person_outlined,

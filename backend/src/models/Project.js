@@ -39,7 +39,7 @@ const Project = {
        FROM projects p
        LEFT JOIN clients c ON p.client_id = c.id
        JOIN users u ON p.created_by = u.id
-       WHERE p.id = $1`,
+       WHERE p.id = $1 AND p.deleted_at IS NULL`,
       [id]
     );
     return rows[0] || null;
@@ -59,7 +59,7 @@ const Project = {
       JOIN users u ON p.created_by = u.id
     `;
 
-    const conditions = [];
+    const conditions = ['p.deleted_at IS NULL'];
     const values = [];
     let paramIndex = 1;
 
@@ -89,9 +89,7 @@ const Project = {
       paramIndex++;
     }
 
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
+    query += ' WHERE ' + conditions.join(' AND ');
 
     query += ` ORDER BY p.updated_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     values.push(limit, offset);
@@ -131,6 +129,34 @@ const Project = {
       [id]
     );
     return rows[0] || null;
+  },
+
+  async softDelete(id, userId) {
+    const { rows } = await pool.query(
+      `UPDATE projects SET deleted_at = NOW(), deleted_by = $2 WHERE id = $1 RETURNING *`,
+      [id, userId]
+    );
+    return rows[0] || null;
+  },
+
+  async restore(id) {
+    const { rows } = await pool.query(
+      `UPDATE projects SET deleted_at = NULL, deleted_by = NULL WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return rows[0] || null;
+  },
+
+  async findTrash(userId) {
+    const { rows } = await pool.query(
+      `SELECT p.*, u.name AS created_by_name
+       FROM projects p
+       JOIN users u ON p.created_by = u.id
+       WHERE p.deleted_at IS NOT NULL AND p.deleted_by = $1
+       ORDER BY p.deleted_at DESC`,
+      [userId]
+    );
+    return rows;
   },
 
   async getMembers(projectId) {
@@ -205,7 +231,7 @@ const Project = {
   },
 
   async count() {
-    const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM projects');
+    const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM projects WHERE deleted_at IS NULL');
     return rows[0].count;
   },
 };

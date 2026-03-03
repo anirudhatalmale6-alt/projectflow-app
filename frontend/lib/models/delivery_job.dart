@@ -15,6 +15,7 @@ class DeliveryJob {
   final String? reviewNotes;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool requiresApproval;
 
   DeliveryJob({
     required this.id,
@@ -33,6 +34,7 @@ class DeliveryJob {
     this.reviewNotes,
     this.createdAt,
     this.updatedAt,
+    this.requiresApproval = true,
   });
 
   factory DeliveryJob.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class DeliveryJob {
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'])
           : null,
+      requiresApproval: json['requires_approval'] == true,
     );
   }
 
@@ -83,7 +86,7 @@ class DeliveryJob {
   String get versionLabel => 'v$version';
 
   bool get canBeReviewed =>
-      status == 'uploaded' || status == 'in_review';
+      requiresApproval && (status == 'uploaded' || status == 'in_review');
 
   DeliveryJob copyWith({
     String? id,
@@ -98,6 +101,7 @@ class DeliveryJob {
     String? uploadedBy,
     String? reviewedBy,
     String? reviewNotes,
+    bool? requiresApproval,
   }) {
     return DeliveryJob(
       id: id ?? this.id,
@@ -116,6 +120,7 @@ class DeliveryJob {
       reviewNotes: reviewNotes ?? this.reviewNotes,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      requiresApproval: requiresApproval ?? this.requiresApproval,
     );
   }
 }

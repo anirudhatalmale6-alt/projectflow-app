@@ -171,27 +171,37 @@ router.put('/:id', requireProjectManager(), async (req, res, next) => {
   }
 });
 
-// DELETE /api/v1/projects/:id - archive project
-// Only admin or project manager
-router.delete('/:id', requireProjectManager(), async (req, res, next) => {
+// DELETE /api/v1/projects/:id - soft delete (move to trash)
+// Only the project author (created_by) can delete
+router.delete('/:id', auth, async (req, res, next) => {
   try {
-    const project = await Project.findById(req.params.id);
+    // Use raw query to find even if findById filters deleted
+    const { rows } = await pool.query(
+      'SELECT * FROM projects WHERE id = $1 AND deleted_at IS NULL',
+      [req.params.id]
+    );
+    const project = rows[0];
     if (!project) {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
-    const archived = await Project.delete(req.params.id);
+    // Only author can delete
+    if (project.created_by !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only the project author can delete this project.' });
+    }
+
+    const deleted = await Project.softDelete(req.params.id, req.user.id);
 
     await logAudit({
       userId: req.user.id,
-      action: 'archive',
+      action: 'soft_delete',
       entityType: 'project',
       entityId: project.id,
       details: { name: project.name },
       ipAddress: getClientIp(req),
     });
 
-    res.json({ message: 'Project archived successfully.', project: archived });
+    res.json({ message: 'Project moved to trash.', project: deleted });
   } catch (err) {
     next(err);
   }

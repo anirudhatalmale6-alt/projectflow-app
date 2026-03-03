@@ -1,6 +1,7 @@
 const express = require('express');
 const DeliveryJob = require('../models/DeliveryJob');
 const Project = require('../models/Project');
+const Task = require('../models/Task');
 const Notification = require('../models/Notification');
 const auth = require('../middleware/auth');
 const { requireProjectAccess, requireProjectRole } = require('../middleware/rbac');
@@ -435,10 +436,15 @@ router.delete('/deliveries/:id', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/trash - get current user's trash
+// GET /api/v1/trash - get current user's trash (deliveries, projects, tasks)
 router.get('/trash', async (req, res, next) => {
   try {
-    const items = await DeliveryJob.findTrashByUser(req.user.id);
+    const deliveries = (await DeliveryJob.findTrashByUser(req.user.id)).map(d => ({ ...d, _type: 'delivery' }));
+    const projects = (await Project.findTrash(req.user.id)).map(p => ({ ...p, _type: 'project' }));
+    const tasks = (await Task.findTrash(req.user.id)).map(t => ({ ...t, _type: 'task' }));
+    const items = [...deliveries, ...projects, ...tasks].sort(
+      (a, b) => new Date(b.deleted_at) - new Date(a.deleted_at)
+    );
     res.json({ items });
   } catch (err) {
     next(err);
@@ -448,12 +454,26 @@ router.get('/trash', async (req, res, next) => {
 // POST /api/v1/trash/:id/restore - restore from trash
 router.post('/trash/:id/restore', async (req, res, next) => {
   try {
+    const { type } = req.query; // ?type=delivery|project|task
+
+    if (type === 'project') {
+      const restored = await Project.restore(req.params.id);
+      if (!restored) return res.status(404).json({ error: 'Item not found in trash.' });
+      return res.json({ message: 'Project restored.', item: restored });
+    }
+
+    if (type === 'task') {
+      const restored = await Task.restore(req.params.id);
+      if (!restored) return res.status(404).json({ error: 'Item not found in trash.' });
+      return res.json({ message: 'Task restored.', item: restored });
+    }
+
+    // Default: delivery
     const delivery = await DeliveryJob.findById(req.params.id);
     if (!delivery || !delivery.deleted_at) {
       return res.status(404).json({ error: 'Item not found in trash.' });
     }
 
-    // Only the person who deleted it or admin can restore
     if (req.user.role !== 'admin' && delivery.deleted_by !== req.user.id) {
       const membership = await Project.isMember(delivery.project_id, req.user.id);
       if (!membership || membership.role !== 'manager') {
@@ -462,7 +482,7 @@ router.post('/trash/:id/restore', async (req, res, next) => {
     }
 
     const restored = await DeliveryJob.restore(req.params.id);
-    res.json({ message: 'File restored.', delivery: restored });
+    res.json({ message: 'File restored.', item: restored });
   } catch (err) {
     next(err);
   }
@@ -471,6 +491,18 @@ router.post('/trash/:id/restore', async (req, res, next) => {
 // DELETE /api/v1/trash/:id - permanently delete from trash
 router.delete('/trash/:id', async (req, res, next) => {
   try {
+    const { type } = req.query;
+
+    if (type === 'project') {
+      await pool.query('DELETE FROM projects WHERE id = $1 AND deleted_at IS NOT NULL', [req.params.id]);
+      return res.json({ message: 'Project permanently deleted.' });
+    }
+
+    if (type === 'task') {
+      await pool.query('DELETE FROM tasks WHERE id = $1 AND deleted_at IS NOT NULL', [req.params.id]);
+      return res.json({ message: 'Task permanently deleted.' });
+    }
+
     const delivery = await DeliveryJob.findById(req.params.id);
     if (!delivery || !delivery.deleted_at) {
       return res.status(404).json({ error: 'Item not found in trash.' });
@@ -503,12 +535,17 @@ router.delete('/trash/:id', async (req, res, next) => {
 // DELETE /api/v1/trash - empty entire trash for current user
 router.delete('/trash', async (req, res, next) => {
   try {
-    const items = await DeliveryJob.findTrashByUser(req.user.id);
+    const deliveries = await DeliveryJob.findTrashByUser(req.user.id);
     let deleted = 0;
-    for (const item of items) {
+    for (const item of deliveries) {
       await DeliveryJob.permanentDelete(item.id);
       deleted++;
     }
+    // Also delete trashed projects and tasks
+    const projResult = await pool.query('DELETE FROM projects WHERE deleted_at IS NOT NULL AND deleted_by = $1', [req.user.id]);
+    deleted += projResult.rowCount;
+    const taskResult = await pool.query('DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_by = $1', [req.user.id]);
+    deleted += taskResult.rowCount;
     res.json({ message: `${deleted} items permanently deleted.`, count: deleted });
   } catch (err) {
     next(err);

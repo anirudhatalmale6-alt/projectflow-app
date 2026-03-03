@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
+import '../../config/api_config.dart';
 import '../../models/comment.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/delivery_provider.dart';
+import '../../services/api_service.dart';
 import '../../services/comment_service.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/comment_widget.dart';
@@ -19,10 +22,13 @@ class DeliveryDetailScreen extends StatefulWidget {
 
 class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   final CommentService _commentService = CommentService();
+  final ApiService _api = ApiService();
   List<Comment> _comments = [];
   bool _loadingComments = false;
   bool _sendingComment = false;
   String? _deliveryId;
+  String? _fileDownloadUrl;
+  bool _loadingFileUrl = false;
   final _reviewNotesController = TextEditingController();
 
   @override
@@ -33,6 +39,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
       _deliveryId = id;
       context.read<DeliveryProvider>().loadDelivery(id);
       _loadComments();
+      _loadFileUrl(id);
     }
   }
 
@@ -50,6 +57,38 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           await _commentService.getComments('delivery', _deliveryId!);
     } catch (_) {}
     setState(() => _loadingComments = false);
+  }
+
+  Future<void> _loadFileUrl(String id) async {
+    setState(() => _loadingFileUrl = true);
+    try {
+      final data = await _api.get(ApiConfig.deliveryDownload(id));
+      setState(() => _fileDownloadUrl = data['download_url']);
+    } catch (_) {
+      setState(() => _fileDownloadUrl = null);
+    }
+    setState(() => _loadingFileUrl = false);
+  }
+
+  bool _isPreviewable(String? format) {
+    if (format == null) return false;
+    final f = format.toLowerCase();
+    return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp',
+            'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx'].contains(f);
+  }
+
+  bool _isImage(String? format) {
+    if (format == null) return false;
+    final f = format.toLowerCase();
+    return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].contains(f);
+  }
+
+  Future<void> _openFile() async {
+    if (_fileDownloadUrl == null) return;
+    final uri = Uri.parse(_fileDownloadUrl!);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Future<void> _addComment(String content) async {
@@ -167,7 +206,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                   // File preview area
                   Container(
                     width: double.infinity,
-                    height: 200,
+                    constraints: const BoxConstraints(minHeight: 200),
                     decoration: BoxDecoration(
                       color: AppTheme.secondaryColor.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(16),
@@ -175,34 +214,55 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                         color: AppTheme.secondaryColor.withOpacity(0.2),
                       ),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: _loadingFileUrl
+                        ? const SizedBox(
+                            height: 200,
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        : _isImage(delivery.format) && _fileDownloadUrl != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.network(
+                                  _fileDownloadUrl!,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => _buildFilePlaceholder(delivery),
+                                ),
+                              )
+                            : _buildFilePlaceholder(delivery),
+                  ),
+                  if (_fileDownloadUrl != null) ...[
+                    const SizedBox(height: 10),
+                    Row(
                       children: [
-                        Icon(
-                          _getFormatIcon(delivery.format),
-                          size: 56,
-                          color: AppTheme.secondaryColor.withOpacity(0.5),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          delivery.format?.toUpperCase() ?? 'ARQUIVO',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.secondaryColor,
+                        if (_isPreviewable(delivery.format))
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _openFile,
+                              icon: const Icon(Icons.visibility_outlined),
+                              label: const Text('Visualizar'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.primaryColor,
+                                side: const BorderSide(color: AppTheme.primaryColor),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          delivery.fileSizeFormatted,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.textSecondary,
+                        if (_isPreviewable(delivery.format))
+                          const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _openFile,
+                            icon: const Icon(Icons.download_outlined),
+                            label: const Text('Baixar'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.textSecondary,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 20),
                   // Title and version
                   Row(
@@ -412,6 +472,39 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           CommentInput(
             onSubmit: _addComment,
             isLoading: _sendingComment,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilePlaceholder(delivery) {
+    return SizedBox(
+      height: 200,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _getFormatIcon(delivery.format),
+            size: 56,
+            color: AppTheme.secondaryColor.withOpacity(0.5),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            delivery.format?.toUpperCase() ?? 'ARQUIVO',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.secondaryColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            delivery.fileSizeFormatted,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+            ),
           ),
         ],
       ),

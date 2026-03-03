@@ -316,7 +316,8 @@ router.put('/tasks/:id', async (req, res, next) => {
   }
 });
 
-// DELETE /api/v1/tasks/:id - delete task
+// DELETE /api/v1/tasks/:id - soft delete (move to trash)
+// Only the task author (reporter) can delete
 router.delete('/tasks/:id', async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
@@ -324,24 +325,16 @@ router.delete('/tasks/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Task not found.' });
     }
 
-    // Only admin, manager, or project manager can delete tasks
-    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
-      const membership = await Project.isMember(task.project_id, req.user.id);
-      if (!membership || membership.role !== 'manager') {
-        // Editors can delete their own reported tasks
-        if (membership && membership.role === 'editor' && task.reporter_id === req.user.id) {
-          // OK, allow
-        } else {
-          return res.status(403).json({ error: 'Access denied. Only managers can delete tasks.' });
-        }
-      }
+    // Only author (reporter) or admin can delete
+    if (task.reporter_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only the task author can delete this task.' });
     }
 
-    await Task.delete(req.params.id);
+    const deleted = await Task.softDelete(req.params.id, req.user.id);
 
     await logAudit({
       userId: req.user.id,
-      action: 'delete',
+      action: 'soft_delete',
       entityType: 'task',
       entityId: req.params.id,
       details: { title: task.title, project_id: task.project_id },
@@ -357,7 +350,7 @@ router.delete('/tasks/:id', async (req, res, next) => {
       });
     }
 
-    res.json({ message: 'Task deleted successfully.' });
+    res.json({ message: 'Task moved to trash.', task: deleted });
   } catch (err) {
     next(err);
   }

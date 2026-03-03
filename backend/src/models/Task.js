@@ -34,7 +34,7 @@ const Task = {
        LEFT JOIN users a ON t.assignee_id = a.id
        JOIN users r ON t.reporter_id = r.id
        JOIN projects p ON t.project_id = p.id
-       WHERE t.id = $1`,
+       WHERE t.id = $1 AND t.deleted_at IS NULL`,
       [id]
     );
     return rows[0] || null;
@@ -51,7 +51,7 @@ const Task = {
       FROM tasks t
       LEFT JOIN users a ON t.assignee_id = a.id
       JOIN users r ON t.reporter_id = r.id
-      WHERE t.project_id = $1
+      WHERE t.project_id = $1 AND t.deleted_at IS NULL
     `;
     const values = [projectId];
     let paramIndex = 2;
@@ -200,6 +200,34 @@ const Task = {
     }
   },
 
+  async softDelete(id, userId) {
+    const { rows } = await pool.query(
+      `UPDATE tasks SET deleted_at = NOW(), deleted_by = $2 WHERE id = $1 RETURNING *`,
+      [id, userId]
+    );
+    return rows[0] || null;
+  },
+
+  async restore(id) {
+    const { rows } = await pool.query(
+      `UPDATE tasks SET deleted_at = NULL, deleted_by = NULL WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return rows[0] || null;
+  },
+
+  async findTrash(userId) {
+    const { rows } = await pool.query(
+      `SELECT t.*, p.name AS project_name
+       FROM tasks t
+       JOIN projects p ON t.project_id = p.id
+       WHERE t.deleted_at IS NOT NULL AND t.deleted_by = $1
+       ORDER BY t.deleted_at DESC`,
+      [userId]
+    );
+    return rows;
+  },
+
   async getSubtasks(parentTaskId) {
     const { rows } = await pool.query(
       `SELECT t.*, a.name AS assignee_name, a.avatar_url AS assignee_avatar
@@ -217,7 +245,7 @@ const Task = {
       SELECT t.*, p.name AS project_name, p.status AS project_status
       FROM tasks t
       JOIN projects p ON t.project_id = p.id
-      WHERE t.assignee_id = $1
+      WHERE t.assignee_id = $1 AND t.deleted_at IS NULL
     `;
     const values = [userId];
 
@@ -233,7 +261,7 @@ const Task = {
   },
 
   async countAll() {
-    const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM tasks');
+    const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM tasks WHERE deleted_at IS NULL');
     return rows[0].count;
   },
 };

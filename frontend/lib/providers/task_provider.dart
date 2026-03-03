@@ -9,11 +9,13 @@ class TaskProvider with ChangeNotifier {
   List<Task> _tasks = [];
   Task? _currentTask;
   bool _isLoading = false;
+  bool _loadingTask = false;
   String? _errorMessage;
 
   List<Task> get tasks => _tasks;
   Task? get currentTask => _currentTask;
   bool get isLoading => _isLoading;
+  bool get loadingTask => _loadingTask;
   String? get errorMessage => _errorMessage;
 
   // Kanban columns
@@ -46,7 +48,8 @@ class TaskProvider with ChangeNotifier {
   }
 
   Future<void> loadTask(String id) async {
-    _isLoading = true;
+    _loadingTask = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
@@ -54,7 +57,7 @@ class TaskProvider with ChangeNotifier {
     } catch (e) {
       _errorMessage = _parseError(e);
     }
-    _isLoading = false;
+    _loadingTask = false;
     notifyListeners();
   }
 

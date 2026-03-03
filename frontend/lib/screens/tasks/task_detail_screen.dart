@@ -348,10 +348,40 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final task = taskProvider.currentTask;
     final auth = context.watch<AuthProvider>();
 
-    if (taskProvider.isLoading || task == null) {
+    if (taskProvider.loadingTask) {
       return Scaffold(
         appBar: AppBar(),
         body: const LoadingWidget(message: 'Carregando tarefa...'),
+      );
+    }
+
+    if (task == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                taskProvider.errorMessage ?? 'Tarefa não encontrada',
+                style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  if (_taskId != null) {
+                    context.read<TaskProvider>().loadTask(_taskId!);
+                  }
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 

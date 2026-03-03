@@ -31,7 +31,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {}); // Rebuild to update FAB
@@ -243,7 +243,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   isScrollable: true,
                   tabs: const [
                     Tab(text: 'Tarefas'),
-                    Tab(text: 'Jobs'),
                     Tab(text: 'Entregas'),
                     Tab(text: 'Chat'),
                     Tab(text: 'Drive'),
@@ -259,7 +258,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           controller: _tabController,
           children: [
             _buildTasksTab(auth),
-            _buildJobsTab(auth),
             _buildDeliveriesTab(auth),
             _buildChatTab(),
             _buildDriveTab(),
@@ -280,14 +278,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             arguments: _projectId),
         icon: const Icon(Icons.add),
         label: const Text('Nova Tarefa'),
-      );
-    } else if (_tabController.index == 1 && auth.canManageProjects) {
-      // Jobs tab
-      return FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, '/jobs',
-            arguments: _projectId),
-        icon: const Icon(Icons.work_outline),
-        label: const Text('Ver Jobs'),
       );
     }
     return null;

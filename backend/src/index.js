@@ -177,8 +177,12 @@ app.use('/api/v1', driveRoutes);
 
 // =============================================================
 
-// Serve Flutter web frontend
+// Serve uploaded files
 const path = require('path');
+const uploadsDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
+app.use('/uploads', express.static(uploadsDir));
+
+// Serve Flutter web frontend
 const publicDir = path.join(__dirname, '..', 'public');
 app.use(express.static(publicDir));
 

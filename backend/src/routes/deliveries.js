@@ -1,4 +1,5 @@
 const express = require('express');
+const pathModule = require('path');
 const DeliveryJob = require('../models/DeliveryJob');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
@@ -9,6 +10,12 @@ const { logAudit, getClientIp } = require('../utils/audit');
 const pool = require('../config/database');
 const { upload } = require('../middleware/upload');
 const FileService = require('../services/fileService');
+
+function extractFormat(filename) {
+  if (!filename) return null;
+  const ext = pathModule.extname(filename).replace('.', '').toLowerCase();
+  return ext || null;
+}
 
 const router = express.Router();
 
@@ -54,12 +61,14 @@ router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'ed
       fileSize = result.size || req.file.size;
     }
 
+    const autoFormat = format || (req.file ? extractFormat(req.file.originalname) : extractFormat(title));
+
     const delivery = await DeliveryJob.create({
       projectId,
       taskId: task_id || null,
       title: title.trim(),
       description: description || null,
-      format: format || null,
+      format: autoFormat,
       fileUrl,
       fileSize,
       uploadedBy: req.user.id,
@@ -207,12 +216,14 @@ router.post('/tasks/:taskId/deliveries', upload.single('file'), async (req, res,
       fileSize = result.size || req.file.size;
     }
 
+    const autoFormat = format || (req.file ? extractFormat(req.file.originalname) : extractFormat(deliveryTitle));
+
     const delivery = await DeliveryJob.create({
       projectId,
       taskId,
       title: deliveryTitle,
       description: description || null,
-      format: format || null,
+      format: autoFormat,
       fileUrl,
       fileSize,
       uploadedBy: req.user.id,

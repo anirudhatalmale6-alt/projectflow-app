@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../models/comment.dart';
@@ -170,6 +171,46 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     if (isApproved) return isManagerOrAdmin;
     // Non-approved files: uploader or admin/manager
     return isUploader || isManagerOrAdmin;
+  }
+
+  String? _extractFormat(String? fileName) {
+    if (fileName == null) return null;
+    final dot = fileName.lastIndexOf('.');
+    if (dot >= 0 && dot < fileName.length - 1) {
+      return fileName.substring(dot + 1).toLowerCase();
+    }
+    return null;
+  }
+
+  bool _isPreviewable(String? ext) {
+    if (ext == null) return false;
+    return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp',
+            'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx'].contains(ext);
+  }
+
+  Future<void> _viewDeliveryFile(String deliveryId) async {
+    try {
+      final data = await _api.get(ApiConfig.deliveryDownload(deliveryId));
+      String? url = data['download_url'];
+      if (url != null) {
+        if (url.startsWith('/')) {
+          url = '${ApiConfig.baseUrl}$url';
+        }
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao abrir arquivo: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _deleteDelivery(String deliveryId, String title) async {
@@ -755,8 +796,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.comment_outlined, size: 16, color: Colors.grey[400]),
-                                        const SizedBox(width: 2),
+                                        InkWell(
+                                          onTap: () => _viewDeliveryFile(d['id']?.toString() ?? ''),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(4),
+                                            child: Icon(
+                                              _isPreviewable(_extractFormat(title))
+                                                  ? Icons.visibility_outlined
+                                                  : Icons.download_outlined,
+                                              size: 20,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                          ),
+                                        ),
                                         if (_canDeleteDelivery(d, context.read<AuthProvider>()))
                                           InkWell(
                                             onTap: () => _deleteDelivery(

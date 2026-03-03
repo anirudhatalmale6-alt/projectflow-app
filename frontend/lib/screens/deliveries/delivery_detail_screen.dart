@@ -63,23 +63,38 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     setState(() => _loadingFileUrl = true);
     try {
       final data = await _api.get(ApiConfig.deliveryDownload(id));
-      setState(() => _fileDownloadUrl = data['download_url']);
+      String? url = data['download_url'];
+      // For local uploads, resolve relative URL against base
+      if (url != null && url.startsWith('/')) {
+        url = '${ApiConfig.baseUrl}$url';
+      }
+      setState(() => _fileDownloadUrl = url);
     } catch (_) {
       setState(() => _fileDownloadUrl = null);
     }
     setState(() => _loadingFileUrl = false);
   }
 
-  bool _isPreviewable(String? format) {
-    if (format == null) return false;
-    final f = format.toLowerCase();
+  String? _resolveFormat(String? format, String? title) {
+    if (format != null && format.isNotEmpty) return format.toLowerCase();
+    if (title == null) return null;
+    final dot = title.lastIndexOf('.');
+    if (dot >= 0 && dot < title.length - 1) {
+      return title.substring(dot + 1).toLowerCase();
+    }
+    return null;
+  }
+
+  bool _isPreviewable(String? format, [String? title]) {
+    final f = _resolveFormat(format, title);
+    if (f == null) return false;
     return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp',
             'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx'].contains(f);
   }
 
-  bool _isImage(String? format) {
-    if (format == null) return false;
-    final f = format.toLowerCase();
+  bool _isImage(String? format, [String? title]) {
+    final f = _resolveFormat(format, title);
+    if (f == null) return false;
     return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].contains(f);
   }
 
@@ -219,7 +234,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                             height: 200,
                             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                           )
-                        : _isImage(delivery.format) && _fileDownloadUrl != null
+                        : _isImage(delivery.format, delivery.title) && _fileDownloadUrl != null
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
                                 child: Image.network(
@@ -234,7 +249,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        if (_isPreviewable(delivery.format))
+                        if (_isPreviewable(delivery.format, delivery.title))
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: _openFile,
@@ -247,7 +262,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                               ),
                             ),
                           ),
-                        if (_isPreviewable(delivery.format))
+                        if (_isPreviewable(delivery.format, delivery.title))
                           const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton.icon(
@@ -485,13 +500,13 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            _getFormatIcon(delivery.format),
+            _getFormatIcon(delivery.format, delivery.title),
             size: 56,
             color: AppTheme.secondaryColor.withOpacity(0.5),
           ),
           const SizedBox(height: 12),
           Text(
-            delivery.format?.toUpperCase() ?? 'ARQUIVO',
+            (_resolveFormat(delivery.format, delivery.title) ?? 'arquivo').toUpperCase(),
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -541,24 +556,47 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
-  IconData _getFormatIcon(String? format) {
-    switch (format?.toLowerCase()) {
+  IconData _getFormatIcon(String? format, [String? title]) {
+    final f = _resolveFormat(format, title);
+    switch (f) {
       case 'mp4':
       case 'mov':
       case 'avi':
       case 'mkv':
+      case 'webm':
         return Icons.videocam_outlined;
       case 'mp3':
       case 'wav':
+      case 'aac':
         return Icons.audiotrack_outlined;
-      case 'psd':
-      case 'ai':
       case 'png':
       case 'jpg':
+      case 'jpeg':
+      case 'gif':
+      case 'webp':
+      case 'bmp':
         return Icons.image_outlined;
+      case 'pdf':
+        return Icons.picture_as_pdf_outlined;
+      case 'doc':
+      case 'docx':
+      case 'txt':
+        return Icons.description_outlined;
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return Icons.table_chart_outlined;
+      case 'psd':
+      case 'ai':
+      case 'svg':
+        return Icons.design_services_outlined;
       case 'prproj':
       case 'aep':
         return Icons.movie_creation_outlined;
+      case 'zip':
+      case 'rar':
+      case '7z':
+        return Icons.folder_zip_outlined;
       default:
         return Icons.insert_drive_file_outlined;
     }

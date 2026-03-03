@@ -18,9 +18,9 @@ router.get('/projects/:projectId/tasks', requireProjectAccess(), async (req, res
     const { projectId } = req.params;
     const { status, assignee, priority, search } = req.query;
 
-    // Freelancers can only see their own tasks
+    // Editors and freelancers can only see their own assigned tasks
     let assigneeId = assignee;
-    if (req.user.role === 'freelancer' && req.projectRole === 'freelancer') {
+    if (req.projectRole === 'freelancer' || req.projectRole === 'editor') {
       assigneeId = req.user.id;
     }
 
@@ -149,11 +149,11 @@ router.get('/tasks/:id', async (req, res, next) => {
     if (req.user.role !== 'admin') {
       const membership = await Project.isMember(task.project_id, req.user.id);
       if (!membership && req.user.role !== 'manager') {
-        // Freelancers can only see tasks assigned to them
-        if (req.user.role === 'freelancer' && task.assignee_id !== req.user.id) {
-          return res.status(403).json({ error: 'Access denied.' });
-        }
-        if (!membership) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+      // Editors and freelancers can only see tasks assigned to them
+      if (membership && (membership.role === 'editor' || membership.role === 'freelancer')) {
+        if (task.assignee_id !== req.user.id) {
           return res.status(403).json({ error: 'Access denied.' });
         }
       }

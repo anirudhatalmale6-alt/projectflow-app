@@ -1,11 +1,11 @@
 const pool = require('../config/database');
 
 const DeliveryJob = {
-  async create({ projectId, title, description, format, fileUrl, fileSize, uploadedBy, taskId }) {
+  async create({ projectId, title, description, format, fileUrl, fileSize, uploadedBy, taskId, requiresApproval }) {
     // version is auto-incremented by the database trigger
     const { rows } = await pool.query(
-      `INSERT INTO delivery_jobs (project_id, title, description, format, file_url, file_size, status, uploaded_by, task_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO delivery_jobs (project_id, title, description, format, file_url, file_size, status, uploaded_by, task_id, requires_approval)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         projectId, title, description || null, format || null,
@@ -13,6 +13,7 @@ const DeliveryJob = {
         fileUrl ? 'uploaded' : 'pending',
         uploadedBy,
         taskId || null,
+        requiresApproval === true || requiresApproval === 'true',
       ]
     );
     return rows[0];
@@ -43,7 +44,7 @@ const DeliveryJob = {
       FROM delivery_jobs dj
       LEFT JOIN users u_up ON dj.uploaded_by = u_up.id
       LEFT JOIN users u_rev ON dj.reviewed_by = u_rev.id
-      WHERE dj.project_id = $1
+      WHERE dj.project_id = $1 AND dj.requires_approval = true
     `;
     const values = [projectId];
     let paramIndex = 2;
@@ -62,7 +63,7 @@ const DeliveryJob = {
   },
 
   async update(id, fields) {
-    const allowed = ['title', 'description', 'format', 'file_url', 'file_size', 'status', 'reviewed_by', 'review_notes'];
+    const allowed = ['title', 'description', 'format', 'file_url', 'file_size', 'status', 'reviewed_by', 'review_notes', 'requires_approval'];
     const setClauses = [];
     const values = [];
     let paramIndex = 1;

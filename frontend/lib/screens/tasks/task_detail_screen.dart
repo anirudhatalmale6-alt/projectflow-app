@@ -81,6 +81,32 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final file = result.files.first;
     if (file.bytes == null) return;
 
+    // Ask if this file needs approval
+    final requiresApproval = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tipo de arquivo'),
+        content: const Text(
+          'Este arquivo precisa de aprovação do gerente/administrador?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Não, apenas anexo'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+            ),
+            child: const Text('Sim, enviar para aprovação'),
+          ),
+        ],
+      ),
+    );
+
+    if (requiresApproval == null) return; // dismissed
+
     setState(() => _uploading = true);
 
     try {
@@ -88,6 +114,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ApiConfig.deliveriesByTask(_taskId!),
         fields: {
           'title': file.name,
+          'requires_approval': requiresApproval ? 'true' : 'false',
         },
         fileBytes: file.bytes!,
         fileName: file.name,
@@ -96,8 +123,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       await _loadDeliveries();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Arquivo enviado com sucesso!'),
+          SnackBar(
+            content: Text(requiresApproval
+                ? 'Arquivo enviado para aprovação!'
+                : 'Arquivo anexado com sucesso!'),
             backgroundColor: AppTheme.successColor,
           ),
         );
@@ -541,6 +570,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                             .toLocal())
                                     : '';
                                 final version = d['version'] ?? 1;
+                                final needsApproval = d['requires_approval'] == true;
 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
@@ -623,6 +653,31 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                                   fontSize: 10,
                                                   color:
                                                       AppTheme.textTertiary,
+                                                ),
+                                              ),
+                                            ],
+                                            if (needsApproval) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange.withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.approval, size: 10, color: Colors.orange),
+                                                    SizedBox(width: 2),
+                                                    Text(
+                                                      'Aprovação',
+                                                      style: TextStyle(
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: Colors.orange,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                             ],

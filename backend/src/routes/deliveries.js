@@ -37,7 +37,7 @@ router.get('/projects/:projectId/deliveries', requireProjectAccess(), async (req
 router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'editor'), upload.single('file'), async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const { title, description, format, task_id } = req.body;
+    const { title, description, format, task_id, requires_approval } = req.body;
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({ error: 'Delivery title is required.' });
@@ -62,6 +62,7 @@ router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'ed
       fileUrl,
       fileSize,
       uploadedBy: req.user.id,
+      requiresApproval: requires_approval !== undefined ? requires_approval : true,
     });
 
     // Notify project managers about the new delivery
@@ -175,7 +176,7 @@ router.get('/tasks/:taskId/deliveries', async (req, res, next) => {
 router.post('/tasks/:taskId/deliveries', upload.single('file'), async (req, res, next) => {
   try {
     const { taskId } = req.params;
-    const { title, description, format } = req.body;
+    const { title, description, format, requires_approval } = req.body;
 
     // Verify task exists
     const Task = require('../models/Task');
@@ -214,6 +215,7 @@ router.post('/tasks/:taskId/deliveries', upload.single('file'), async (req, res,
       fileUrl,
       fileSize,
       uploadedBy: req.user.id,
+      requiresApproval: requires_approval,
     });
 
     await logAudit({

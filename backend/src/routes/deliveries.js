@@ -304,7 +304,7 @@ router.get('/deliveries/:id', async (req, res, next) => {
 });
 
 // GET /api/v1/deliveries/:id/download - get presigned download URL for delivery file
-router.get('/deliveries/:id/download', async (req, res, next) => {
+router.get('/deliveries/:id/download', auth, async (req, res, next) => {
   try {
     const delivery = await DeliveryJob.findById(req.params.id);
     if (!delivery) {

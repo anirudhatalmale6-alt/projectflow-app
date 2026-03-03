@@ -192,15 +192,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     try {
       final data = await _api.get(ApiConfig.deliveryDownload(deliveryId));
       String? url = data['download_url'];
-      if (url != null) {
-        if (url.startsWith('/')) {
-          url = '${ApiConfig.baseUrl}$url';
+      if (url == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nenhum arquivo anexado a esta entrega.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
         }
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
+        return;
       }
+      if (url.startsWith('/')) {
+        url = '${ApiConfig.baseUrl}$url';
+      }
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.platformDefault);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -933,19 +940,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Future<void> _downloadDelivery(String deliveryId) async {
     try {
       final data = await _api.get(ApiConfig.deliveryDownload(deliveryId));
-      final url = data['download_url'];
-      if (url != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Link de download copiado!'),
-            backgroundColor: AppTheme.successColor,
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
-          ),
-        );
+      String? url = data['download_url'];
+      if (url != null) {
+        if (url.startsWith('/')) {
+          url = '${ApiConfig.baseUrl}$url';
+        }
+        final uri = Uri.parse(url);
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
       }
     } catch (e) {
       if (mounted) {

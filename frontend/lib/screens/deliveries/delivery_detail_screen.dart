@@ -101,9 +101,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   Future<void> _openFile() async {
     if (_fileDownloadUrl == null) return;
     final uri = Uri.parse(_fileDownloadUrl!);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    await launchUrl(uri, mode: LaunchMode.platformDefault);
   }
 
   Future<void> _addComment(String content) async {

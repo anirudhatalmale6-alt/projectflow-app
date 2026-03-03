@@ -57287,11 +57287,11 @@ o.n(0,"title",B.d.cJ(p.e.a.a))
 o.n(0,"description",B.d.cJ(p.f.a.a))
 o.n(0,"priority",p.x)
 m=p.z
-if(m!=null)o.n(0,"assignee_id",m)
+if(m!=null)o.n(0,"assigneeId",m)
 m=p.y
-if(m!=null)o.n(0,"due_date",m.ox())
+if(m!=null)o.n(0,"dueDate",m.ox())
 m=p.r.a.a
-if(m.length!==0)o.n(0,"estimated_hours",A.o4(m))
+if(m.length!==0)o.n(0,"estimatedHours",A.o4(m))
 o.n(0,"tags",p.as)
 s=p.at?3:5
 break

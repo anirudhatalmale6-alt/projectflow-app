@@ -112,10 +112,10 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
       'priority': _priority,
-      if (_assigneeId != null) 'assignee_id': _assigneeId,
-      if (_dueDate != null) 'due_date': _dueDate!.toIso8601String(),
+      if (_assigneeId != null) 'assigneeId': _assigneeId,
+      if (_dueDate != null) 'dueDate': _dueDate!.toIso8601String(),
       if (_estimatedHoursController.text.isNotEmpty)
-        'estimated_hours':
+        'estimatedHours':
             double.tryParse(_estimatedHoursController.text),
       'tags': _tags,
     };

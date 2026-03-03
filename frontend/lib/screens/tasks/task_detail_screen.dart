@@ -547,7 +547,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: ListTile(
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(10),
+                                    onTap: () => Navigator.pushNamed(
+                                      context,
+                                      '/deliveries/detail',
+                                      arguments: d['id'],
+                                    ),
+                                    child: ListTile(
                                     leading: Container(
                                       width: 42,
                                       height: 42,
@@ -633,18 +640,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                     ),
                                     isThreeLine: true,
                                     dense: true,
-                                    trailing: d['file_url'] != null
-                                        ? IconButton(
-                                            icon: const Icon(
-                                              Icons.download,
-                                              size: 20,
-                                              color: AppTheme.primaryColor,
-                                            ),
-                                            tooltip: 'Baixar',
-                                            onPressed: () =>
-                                                _downloadDelivery(d['id']),
-                                          )
-                                        : null,
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.comment_outlined, size: 16, color: Colors.grey[400]),
+                                        const SizedBox(width: 4),
+                                        Icon(Icons.chevron_right, size: 18, color: Colors.grey[400]),
+                                      ],
+                                    ),
+                                  ),
                                   ),
                                 );
                               }).toList(),

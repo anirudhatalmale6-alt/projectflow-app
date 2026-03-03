@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
@@ -39,6 +40,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final tasks = context.watch<TaskProvider>();
     final notifs = context.watch<NotificationProvider>();
     final user = auth.user;
+
+    final overdueProjects =
+        projects.projects.where((p) => p.isOverdue).toList();
 
     return Scaffold(
       body: RefreshIndicator(
@@ -98,21 +102,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withOpacity(0.8),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            AppTheme.getRoleLabel(user?.role ?? 'editor'),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Poppins',
-                            ),
+                        // Notification bell
+                        GestureDetector(
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/notifications'),
+                          child: Stack(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.notifications_outlined,
+                                    color: Colors.white, size: 22),
+                              ),
+                              if (notifs.unreadCount > 0)
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '${notifs.unreadCount > 9 ? '9+' : notifs.unreadCount}',
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],
@@ -151,7 +176,100 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // ============ OVERDUE PROJECTS ALERT ============
+            if (overdueProjects.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () {
+                      // Show overdue projects in a bottom sheet
+                      _showOverdueProjects(overdueProjects);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.red.shade600,
+                            Colors.red.shade400,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${overdueProjects.length}',
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  overdueProjects.length == 1
+                                      ? 'Projeto em atraso!'
+                                      : 'Projetos em atraso!',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Toque para ver detalhes',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.white.withOpacity(0.9),
+                            size: 28,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            if (overdueProjects.isNotEmpty)
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
             // Stats cards
             SliverToBoxAdapter(
@@ -220,7 +338,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-            // Active tasks
+            // Active tasks - clickable
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -273,23 +391,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-            // Recent projects
+            // Recent projects - clickable with status bars
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const Text(
-                  'Projetos Recentes',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                    fontFamily: 'Poppins',
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Projetos Recentes',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    if (projects.projects.isNotEmpty)
+                      TextButton(
+                        onPressed: () {
+                          // Switch to Projects tab would need a callback; navigate instead
+                        },
+                        child: const Text('Ver todos'),
+                      ),
+                  ],
                 ),
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
             if (projects.projects.isEmpty)
               const SliverToBoxAdapter(
@@ -299,23 +429,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               )
             else
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 140,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount:
-                        projects.projects.length > 5 ? 5 : projects.projects.length,
-                    itemBuilder: (context, index) {
-                      final project = projects.projects[index];
-                      return _buildProjectMiniCard(project);
-                    },
-                  ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final project = projects.projects[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 5),
+                      child: _buildProjectCard(project),
+                    );
+                  },
+                  childCount: projects.projects.length > 6
+                      ? 6
+                      : projects.projects.length,
                 ),
               ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showOverdueProjects(List<dynamic> overdueProjects) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    color: Colors.red, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Projetos em Atraso (${overdueProjects.length})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...overdueProjects.map((p) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.movie_outlined,
+                        color: Colors.red, size: 20),
+                  ),
+                  title: Text(
+                    p.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  subtitle: Text(
+                    p.deadline != null
+                        ? 'Prazo: ${DateFormat('dd/MM/yyyy').format(p.deadline!)} (${p.daysUntilDeadline.abs()} dias de atraso)'
+                        : 'Sem prazo definido',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(context, '/projects/detail',
+                        arguments: p.id);
+                  },
+                )),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -414,144 +614,331 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTaskTile(dynamic task) {
     final color = AppTheme.getTaskStatusColor(task.status);
     final priorityColor = AppTheme.getPriorityColor(task.priority);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 44,
-            decoration: BoxDecoration(
-              color: priorityColor,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                    fontFamily: 'Poppins',
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  AppTheme.getTaskStatusLabel(task.status),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: color,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: priorityColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              AppTheme.getPriorityLabel(task.priority),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () {
+        Navigator.pushNamed(context, '/tasks/detail', arguments: task.id);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.dividerColor),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 44,
+              decoration: BoxDecoration(
                 color: priorityColor,
-                fontFamily: 'Poppins',
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                      fontFamily: 'Poppins',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    AppTheme.getTaskStatusLabel(task.status),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: color,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: priorityColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                AppTheme.getPriorityLabel(task.priority),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: priorityColor,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, size: 18, color: Colors.grey[400]),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildProjectMiniCard(dynamic project) {
+  Widget _buildProjectCard(dynamic project) {
     final color = AppTheme.getProjectStatusColor(project.status);
-    return Container(
-      width: 200,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+    final stats = project.taskStats;
+    final progress = stats.progress;
+    final isOverdue = project.isOverdue;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        Navigator.pushNamed(context, '/projects/detail',
+            arguments: project.id);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isOverdue ? Colors.red.withOpacity(0.4) : AppTheme.dividerColor,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.movie_outlined, color: color, size: 20),
                 ),
-                child: Icon(Icons.movie_outlined, color: color, size: 20),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  AppTheme.getProjectStatusLabel(project.status),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                    fontFamily: 'Poppins',
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        project.name,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                          fontFamily: 'Poppins',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (project.clientName != null)
+                        Text(
+                          project.clientName!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textTertiary,
+                            fontFamily: 'Poppins',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
                 ),
+                // Status badge - clickable to show project detail
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    AppTheme.getProjectStatusLabel(project.status),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Task progress bar
+            if (stats.total > 0) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: SizedBox(
+                        height: 8,
+                        child: Row(
+                          children: [
+                            if (stats.done > 0)
+                              Expanded(
+                                flex: stats.done,
+                                child: Container(
+                                    color: AppTheme.statusCompleted),
+                              ),
+                            if (stats.review > 0)
+                              Expanded(
+                                flex: stats.review,
+                                child: Container(
+                                    color: AppTheme.statusReview),
+                              ),
+                            if (stats.inProgress > 0)
+                              Expanded(
+                                flex: stats.inProgress,
+                                child: Container(
+                                    color: AppTheme.statusInProgress),
+                              ),
+                            if (stats.todo > 0)
+                              Expanded(
+                                flex: stats.todo,
+                                child: Container(
+                                    color: Colors.grey.shade200),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${(progress * 100).toInt()}%',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textSecondary,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Task counts legend
+              Row(
+                children: [
+                  _buildLegendDot(AppTheme.statusCompleted, '${stats.done}'),
+                  const SizedBox(width: 10),
+                  _buildLegendDot(AppTheme.statusReview, '${stats.review}'),
+                  const SizedBox(width: 10),
+                  _buildLegendDot(
+                      AppTheme.statusInProgress, '${stats.inProgress}'),
+                  const SizedBox(width: 10),
+                  _buildLegendDot(Colors.grey.shade300, '${stats.todo}'),
+                  const Spacer(),
+                  if (project.deadline != null)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 12,
+                          color: isOverdue ? Colors.red : AppTheme.textTertiary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          DateFormat('dd/MM').format(project.deadline!),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color:
+                                isOverdue ? Colors.red : AppTheme.textTertiary,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        if (isOverdue) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'ATRASO',
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                ],
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Icon(Icons.info_outline, size: 14, color: Colors.grey[400]),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Sem tarefas',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[400],
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  const Spacer(),
+                  if (project.deadline != null)
+                    Text(
+                      DateFormat('dd/MM/yyyy').format(project.deadline!),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isOverdue ? Colors.red : AppTheme.textTertiary,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                ],
               ),
             ],
-          ),
-          const Spacer(),
-          Text(
-            project.name,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-              fontFamily: 'Poppins',
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          if (project.clientName != null)
-            Text(
-              project.clientName!,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textTertiary,
-                fontFamily: 'Poppins',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildLegendDot(Color color, String count) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          count,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.textTertiary,
+            fontFamily: 'Poppins',
+          ),
+        ),
+      ],
     );
   }
 }

@@ -25,7 +25,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationProvider>().loadNotifications();
+      final notifProvider = context.read<NotificationProvider>();
+      notifProvider.loadNotifications();
+      notifProvider.startListening();
     });
   }
 

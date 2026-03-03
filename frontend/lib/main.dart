@@ -28,6 +28,7 @@ import 'screens/tasks/create_task_screen.dart';
 import 'screens/deliveries/deliveries_list_screen.dart';
 import 'screens/deliveries/delivery_detail_screen.dart';
 import 'screens/deliveries/upload_delivery_screen.dart';
+import 'screens/deliveries/trash_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -107,6 +108,7 @@ class DuozzFlowApp extends StatelessWidget {
           '/jobs/detail': (context) => const JobDetailScreen(),
           '/calendar': (context) => const CalendarScreen(),
           '/reviews/player': (context) => const ReviewPlayerScreen(),
+          '/trash': (context) => const TrashScreen(),
           '/drive': (context) => const DriveFilesScreen(),
         },
       ),

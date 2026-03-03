@@ -64,15 +64,31 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
   }
 
   Future<void> _selectDeadline() async {
+    final now = DateTime.now();
+    final initial = _deadline ?? now.add(const Duration(days: 14));
+    final firstDate = initial.isBefore(now) ? initial : now;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _deadline ?? DateTime.now().add(const Duration(days: 14)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
-      locale: const Locale('pt', 'BR'),
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: now.add(const Duration(days: 365 * 3)),
     );
     if (picked != null) {
-      setState(() => _deadline = picked);
+      final time = await showTimePicker(
+        context: context,
+        initialTime: _deadline != null
+            ? TimeOfDay.fromDateTime(_deadline!)
+            : const TimeOfDay(hour: 18, minute: 0),
+      );
+      setState(() {
+        if (time != null) {
+          _deadline = DateTime(
+              picked.year, picked.month, picked.day, time.hour, time.minute);
+        } else {
+          _deadline = DateTime(picked.year, picked.month, picked.day, 18, 0);
+        }
+      });
     }
   }
 
@@ -239,7 +255,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
                     ),
                     child: Text(
                       _deadline != null
-                          ? DateFormat('dd/MM/yyyy').format(_deadline!)
+                          ? DateFormat('dd/MM/yyyy HH:mm').format(_deadline!)
                           : 'Selecionar data',
                       style: TextStyle(
                         color: _deadline != null

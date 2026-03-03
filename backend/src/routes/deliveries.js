@@ -394,4 +394,121 @@ router.put('/deliveries/:id', async (req, res, next) => {
   }
 });
 
+// DELETE /api/v1/deliveries/:id - soft delete (move to trash)
+// Only uploader or managers can delete
+router.delete('/deliveries/:id', async (req, res, next) => {
+  try {
+    const delivery = await DeliveryJob.findById(req.params.id);
+    if (!delivery) {
+      return res.status(404).json({ error: 'Delivery not found.' });
+    }
+
+    // Check permissions: uploader, project manager, or admin
+    if (req.user.role !== 'admin') {
+      const membership = await Project.isMember(delivery.project_id, req.user.id);
+      if (!membership) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+      if (membership.role !== 'manager' && delivery.uploaded_by !== req.user.id) {
+        return res.status(403).json({ error: 'Only the uploader or a manager can delete this file.' });
+      }
+    }
+
+    const deleted = await DeliveryJob.softDelete(req.params.id, req.user.id);
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'soft_delete',
+      entityType: 'delivery',
+      entityId: req.params.id,
+      details: { title: delivery.title },
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({ message: 'File moved to trash.', delivery: deleted });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/trash - get current user's trash
+router.get('/trash', async (req, res, next) => {
+  try {
+    const items = await DeliveryJob.findTrashByUser(req.user.id);
+    res.json({ items });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/trash/:id/restore - restore from trash
+router.post('/trash/:id/restore', async (req, res, next) => {
+  try {
+    const delivery = await DeliveryJob.findById(req.params.id);
+    if (!delivery || !delivery.deleted_at) {
+      return res.status(404).json({ error: 'Item not found in trash.' });
+    }
+
+    // Only the person who deleted it or admin can restore
+    if (req.user.role !== 'admin' && delivery.deleted_by !== req.user.id) {
+      const membership = await Project.isMember(delivery.project_id, req.user.id);
+      if (!membership || membership.role !== 'manager') {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+    }
+
+    const restored = await DeliveryJob.restore(req.params.id);
+    res.json({ message: 'File restored.', delivery: restored });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/v1/trash/:id - permanently delete from trash
+router.delete('/trash/:id', async (req, res, next) => {
+  try {
+    const delivery = await DeliveryJob.findById(req.params.id);
+    if (!delivery || !delivery.deleted_at) {
+      return res.status(404).json({ error: 'Item not found in trash.' });
+    }
+
+    if (req.user.role !== 'admin' && delivery.deleted_by !== req.user.id) {
+      const membership = await Project.isMember(delivery.project_id, req.user.id);
+      if (!membership || membership.role !== 'manager') {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+    }
+
+    await DeliveryJob.permanentDelete(req.params.id);
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'permanent_delete',
+      entityType: 'delivery',
+      entityId: req.params.id,
+      details: { title: delivery.title },
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({ message: 'File permanently deleted.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/v1/trash - empty entire trash for current user
+router.delete('/trash', async (req, res, next) => {
+  try {
+    const items = await DeliveryJob.findTrashByUser(req.user.id);
+    let deleted = 0;
+    for (const item of items) {
+      await DeliveryJob.permanentDelete(item.id);
+      deleted++;
+    }
+    res.json({ message: `${deleted} items permanently deleted.`, count: deleted });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

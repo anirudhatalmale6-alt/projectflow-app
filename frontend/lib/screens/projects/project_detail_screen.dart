@@ -158,7 +158,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                                     color: Colors.white.withOpacity(0.8)),
                                 const SizedBox(width: 6),
                                 Text(
-                                  'Prazo: ${DateFormat('dd/MM/yyyy').format(project.deadline!)}',
+                                  'Prazo: ${DateFormat('dd/MM/yyyy HH:mm').format(project.deadline!)}',
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.9),
                                     fontSize: 13,
@@ -235,6 +235,52 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             SliverToBoxAdapter(
               child: _buildStatsRow(project),
             ),
+            if (project.description != null &&
+                project.description!.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.dividerColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.description_outlined,
+                                size: 16, color: AppTheme.textSecondary),
+                            SizedBox(width: 6),
+                            Text(
+                              'Descrição',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          project.description!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textPrimary,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             SliverPersistentHeader(
               pinned: true,
               delegate: _SliverTabBarDelegate(

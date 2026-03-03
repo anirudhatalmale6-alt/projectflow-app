@@ -162,6 +162,53 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     context.read<TaskProvider>().updateTaskStatus(_taskId!, newStatus);
   }
 
+  Future<void> _deleteDelivery(String deliveryId, String title) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir arquivo'),
+        content: Text(
+            'Mover "$title" para a lixeira? Você pode restaurar em até 5 dias.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.errorColor),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _api.delete(ApiConfig.deliveryById(deliveryId));
+      await _loadDeliveries();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Arquivo movido para a lixeira'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao excluir: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
   String _formatFileSize(dynamic size) {
     if (size == null) return '';
     final bytes = size is int ? size : int.tryParse(size.toString()) ?? 0;
@@ -699,7 +746,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(Icons.comment_outlined, size: 16, color: Colors.grey[400]),
-                                        const SizedBox(width: 4),
+                                        const SizedBox(width: 2),
+                                        if (d['uploaded_by'] == context.read<AuthProvider>().user?.id ||
+                                            context.read<AuthProvider>().canManageProjects)
+                                          InkWell(
+                                            onTap: () => _deleteDelivery(
+                                              d['id']?.toString() ?? '',
+                                              title,
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(4),
+                                              child: Icon(Icons.delete_outline,
+                                                  size: 18, color: Colors.red[300]),
+                                            ),
+                                          ),
                                         Icon(Icons.chevron_right, size: 18, color: Colors.grey[400]),
                                       ],
                                     ),

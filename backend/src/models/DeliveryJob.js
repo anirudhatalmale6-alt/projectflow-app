@@ -44,7 +44,7 @@ const DeliveryJob = {
       FROM delivery_jobs dj
       LEFT JOIN users u_up ON dj.uploaded_by = u_up.id
       LEFT JOIN users u_rev ON dj.reviewed_by = u_rev.id
-      WHERE dj.project_id = $1 AND dj.requires_approval = true
+      WHERE dj.project_id = $1 AND dj.requires_approval = true AND dj.deleted_at IS NULL
     `;
     const values = [projectId];
     let paramIndex = 2;
@@ -97,7 +97,7 @@ const DeliveryJob = {
       FROM delivery_jobs dj
       LEFT JOIN users u_up ON dj.uploaded_by = u_up.id
       LEFT JOIN users u_rev ON dj.reviewed_by = u_rev.id
-      WHERE dj.task_id = $1
+      WHERE dj.task_id = $1 AND dj.deleted_at IS NULL
     `;
     const values = [taskId];
     let paramIndex = 2;
@@ -115,16 +115,83 @@ const DeliveryJob = {
     return rows;
   },
 
+  // Soft delete - move to trash
+  async softDelete(id, userId) {
+    const { rows } = await pool.query(
+      `UPDATE delivery_jobs SET deleted_at = NOW(), deleted_by = $2 WHERE id = $1 RETURNING *`,
+      [id, userId]
+    );
+    return rows[0] || null;
+  },
+
+  // Restore from trash
+  async restore(id) {
+    const { rows } = await pool.query(
+      `UPDATE delivery_jobs SET deleted_at = NULL, deleted_by = NULL WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    return rows[0] || null;
+  },
+
+  // Get trash items for a project
+  async findTrash(projectId, { limit = 50, offset = 0 } = {}) {
+    const { rows } = await pool.query(
+      `SELECT dj.*,
+        u_up.name AS uploaded_by_name, u_up.avatar_url AS uploaded_by_avatar
+       FROM delivery_jobs dj
+       LEFT JOIN users u_up ON dj.uploaded_by = u_up.id
+       WHERE dj.project_id = $1 AND dj.deleted_at IS NOT NULL
+       ORDER BY dj.deleted_at DESC
+       LIMIT $2 OFFSET $3`,
+      [projectId, limit, offset]
+    );
+    return rows;
+  },
+
+  // Get all trash items for a user (across projects)
+  async findTrashByUser(userId, { limit = 50, offset = 0 } = {}) {
+    const { rows } = await pool.query(
+      `SELECT dj.*,
+        u_up.name AS uploaded_by_name, u_up.avatar_url AS uploaded_by_avatar,
+        p.name AS project_name
+       FROM delivery_jobs dj
+       LEFT JOIN users u_up ON dj.uploaded_by = u_up.id
+       JOIN projects p ON dj.project_id = p.id
+       WHERE dj.deleted_at IS NOT NULL AND dj.deleted_by = $1
+       ORDER BY dj.deleted_at DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, limit, offset]
+    );
+    return rows;
+  },
+
+  // Permanently delete
+  async permanentDelete(id) {
+    const { rows } = await pool.query(
+      'DELETE FROM delivery_jobs WHERE id = $1 RETURNING *',
+      [id]
+    );
+    return rows[0] || null;
+  },
+
+  // Purge items older than 5 days from trash
+  async purgeExpiredTrash() {
+    const { rows } = await pool.query(
+      `DELETE FROM delivery_jobs WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL '5 days' RETURNING id`
+    );
+    return rows.length;
+  },
+
   async countByProject(projectId) {
     const { rows } = await pool.query(
-      'SELECT COUNT(*)::int AS count FROM delivery_jobs WHERE project_id = $1',
+      'SELECT COUNT(*)::int AS count FROM delivery_jobs WHERE project_id = $1 AND deleted_at IS NULL',
       [projectId]
     );
     return rows[0].count;
   },
 
   async countAll() {
-    const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM delivery_jobs');
+    const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM delivery_jobs WHERE deleted_at IS NULL');
     return rows[0].count;
   },
 };

@@ -194,9 +194,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: () {},
                   ),
                   _buildSettingTile(
+                    icon: Icons.delete_outline,
+                    title: 'Lixeira',
+                    subtitle: 'Arquivos excluídos (5 dias para restaurar)',
+                    onTap: () => Navigator.pushNamed(context, '/trash'),
+                  ),
+                  _buildSettingTile(
                     icon: Icons.info_outlined,
                     title: 'Sobre',
-                    subtitle: 'Duozz Flow v1.0.0',
+                    subtitle: 'Duozz Flow v1.5.0',
                     onTap: () {},
                   ),
                   const SizedBox(height: 24),

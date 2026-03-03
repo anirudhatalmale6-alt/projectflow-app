@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiConfig {
-  static const String _serverUrl = 'https://iowa-indication-damaged-accountability.trycloudflare.com';
+  static const String _serverUrl = 'https://hay-plaza-decided-poetry.trycloudflare.com';
 
   static Future<void> loadConfig() async {
     // Using hardcoded HTTPS URL
@@ -66,6 +66,11 @@ class ApiConfig {
   static String deliveryReject(String id) => '$apiPrefix/deliveries/$id/reject';
   static String deliveryRevision(String id) =>
       '$apiPrefix/deliveries/$id/request-revision';
+
+  // Trash
+  static const String trash = '$apiPrefix/trash';
+  static String trashRestore(String id) => '$apiPrefix/trash/$id/restore';
+  static String trashDelete(String id) => '$apiPrefix/trash/$id';
 
   // Comments
   static String comments(String entityType, String entityId) =>

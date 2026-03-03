@@ -65,15 +65,31 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   }
 
   Future<void> _selectDueDate() async {
+    final now = DateTime.now();
+    final initial = _dueDate ?? now.add(const Duration(days: 7));
+    final firstDate = initial.isBefore(now) ? initial : now;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 7)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      locale: const Locale('pt', 'BR'),
+      initialDate: initial,
+      firstDate: firstDate,
+      lastDate: now.add(const Duration(days: 365 * 3)),
     );
     if (picked != null) {
-      setState(() => _dueDate = picked);
+      final time = await showTimePicker(
+        context: context,
+        initialTime: _dueDate != null
+            ? TimeOfDay.fromDateTime(_dueDate!)
+            : const TimeOfDay(hour: 18, minute: 0),
+      );
+      setState(() {
+        if (time != null) {
+          _dueDate = DateTime(
+              picked.year, picked.month, picked.day, time.hour, time.minute);
+        } else {
+          _dueDate = DateTime(picked.year, picked.month, picked.day, 18, 0);
+        }
+      });
     }
   }
 
@@ -212,8 +228,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                     ),
                     child: Text(
                       _dueDate != null
-                          ? DateFormat('dd/MM/yyyy').format(_dueDate!)
-                          : 'Selecionar data',
+                          ? DateFormat('dd/MM/yyyy HH:mm').format(_dueDate!)
+                          : 'Selecionar data e hora',
                       style: TextStyle(
                         color: _dueDate != null
                             ? AppTheme.textPrimary

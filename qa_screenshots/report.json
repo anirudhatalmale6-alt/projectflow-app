@@ -1,0 +1,200 @@
+[
+  {
+    "section": "LOGIN",
+    "test": "Login page loads",
+    "status": "FAIL",
+    "detail": "No login form found"
+  },
+  {
+    "section": "LOGIN",
+    "test": "Login flow",
+    "status": "FAIL",
+    "detail": "Locator.fill: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"input[type='email'], input[type='text']\").first\n"
+  },
+  {
+    "section": "NAV",
+    "test": "Navigation present",
+    "status": "WARN",
+    "detail": "0 nav items found"
+  },
+  {
+    "section": "NAV",
+    "test": "Projects section accessible",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Projects list loads",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Project cards found",
+    "status": "FAIL",
+    "detail": "No project cards in list"
+  },
+  {
+    "section": "TASKS",
+    "test": "Tasks list loads",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "section": "TASKS",
+    "test": "Task items found",
+    "status": "WARN",
+    "detail": "No tasks in list"
+  },
+  {
+    "section": "TASKS_CREATE",
+    "test": "Create task form loads",
+    "status": "FAIL",
+    "detail": ""
+  },
+  {
+    "section": "TASKS_CREATE",
+    "test": "Date picker available",
+    "status": "WARN",
+    "detail": ""
+  },
+  {
+    "section": "TASKS_CREATE",
+    "test": "Assignee selector",
+    "status": "WARN",
+    "detail": ""
+  },
+  {
+    "section": "DELIVERIES",
+    "test": "Deliveries page loads",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "section": "DELIVERIES",
+    "test": "Delivery items found",
+    "status": "WARN",
+    "detail": "No deliveries in list"
+  },
+  {
+    "section": "TRASH",
+    "test": "Trash page loads",
+    "status": "WARN",
+    "detail": ""
+  },
+  {
+    "section": "NOTIFICATIONS",
+    "test": "Notifications page loads",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "section": "NOTIFICATIONS",
+    "test": "Content renders",
+    "status": "WARN",
+    "detail": "Loading Duozz Flow..."
+  },
+  {
+    "section": "CALENDAR",
+    "test": "Calendar page loads",
+    "status": "PASS",
+    "detail": ""
+  },
+  {
+    "section": "ADMIN",
+    "test": "Admin panel loads",
+    "status": "WARN",
+    "detail": ""
+  },
+  {
+    "section": "API",
+    "test": "Login endpoint",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "API",
+    "test": "GET /projects",
+    "status": "PASS",
+    "detail": "Status 200, 5 projects"
+  },
+  {
+    "section": "API",
+    "test": "GET /tasks",
+    "status": "FAIL",
+    "detail": "Status 404"
+  },
+  {
+    "section": "API",
+    "test": "GET /trash",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "API",
+    "test": "GET /notifications",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "API",
+    "test": "GET /admin/stats",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "API",
+    "test": "GET /calendar/events",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "API",
+    "test": "GET /project/members",
+    "status": "FAIL",
+    "detail": "Status 404"
+  },
+  {
+    "section": "API",
+    "test": "GET /project/deliveries",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "CONSOLE",
+    "test": "JS Error",
+    "status": "WARN",
+    "detail": "Failed to load resource: the server responded with a status of 401 ()"
+  },
+  {
+    "section": "CONSOLE",
+    "test": "JS Error",
+    "status": "WARN",
+    "detail": "Failed to load resource: the server responded with a status of 401 ()"
+  },
+  {
+    "section": "CONSOLE",
+    "test": "JS Error",
+    "status": "WARN",
+    "detail": "Failed to load resource: the server responded with a status of 401 ()"
+  },
+  {
+    "section": "CONSOLE",
+    "test": "JS Error",
+    "status": "WARN",
+    "detail": "Failed to load resource: the server responded with a status of 401 ()"
+  },
+  {
+    "section": "CONSOLE",
+    "test": "JS Error",
+    "status": "WARN",
+    "detail": "Failed to load resource: the server responded with a status of 401 ()"
+  },
+  {
+    "section": "CONSOLE",
+    "test": "JS Error",
+    "status": "WARN",
+    "detail": "Failed to load resource: the server responded with a status of 401 ()"
+  }
+]

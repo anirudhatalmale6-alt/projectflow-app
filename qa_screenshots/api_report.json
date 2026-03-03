@@ -1,0 +1,428 @@
+[
+  {
+    "section": "AUTH",
+    "test": "Login",
+    "status": "PASS",
+    "detail": "user=Admin Demo, role=admin"
+  },
+  {
+    "section": "AUTH",
+    "test": "Wrong password rejected",
+    "status": "PASS",
+    "detail": "Status 401"
+  },
+  {
+    "section": "AUTH",
+    "test": "GET /me",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "AUTH",
+    "test": "GET /me without token rejected",
+    "status": "PASS",
+    "detail": "Status 401"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "List projects",
+    "status": "PASS",
+    "detail": "5 projects"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Get project 'Teste Dean'",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Field 'id'",
+    "status": "PASS",
+    "detail": "present, value=a24fe68f-9682-46ee-81b6-2e177bde5f4b"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Field 'name'",
+    "status": "PASS",
+    "detail": "present, value=Teste Dean"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Field 'description'",
+    "status": "PASS",
+    "detail": "present, value=01"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Field 'status'",
+    "status": "PASS",
+    "detail": "present, value=draft"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Field 'deadline'",
+    "status": "PASS",
+    "detail": "present, value=2026-03-18T18:00:00.000Z"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Field 'created_by'",
+    "status": "PASS",
+    "detail": "present, value=78db004a-a495-4828-bca0-e0463afbacd2"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Field 'created_at'",
+    "status": "PASS",
+    "detail": "present, value=2026-03-03T18:04:07.778Z"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Get members",
+    "status": "FAIL",
+    "detail": "Status 404: {\"error\":\"Route GET /api/v1/projects/a24fe68f-9682-46ee-81b6-2e177bde5f4b/members not found.\"}"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Get project tasks",
+    "status": "PASS",
+    "detail": "2 tasks"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Get project deliveries",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Create project",
+    "status": "PASS",
+    "detail": "id=62321cf8-a011-49b0-815c-62ffed19b35f"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Update project",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "PROJECTS",
+    "test": "Soft delete project",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "TASKS",
+    "test": "GET /tasks (global list)",
+    "status": "FAIL",
+    "detail": "Status 404: {\"error\":\"Route GET /api/v1/tasks not found.\"}"
+  },
+  {
+    "section": "TASKS",
+    "test": "Tasks in project 'Teste Dean'",
+    "status": "PASS",
+    "detail": "2 tasks"
+  },
+  {
+    "section": "TASKS",
+    "test": "Get task 'Teste Tarefa Dean'",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'id'",
+    "status": "PASS",
+    "detail": "value=83d4ac51-6a42-4b95-b4ef-43395c85d3fd"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'title'",
+    "status": "PASS",
+    "detail": "value=Teste Tarefa Dean"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'description'",
+    "status": "INFO",
+    "detail": "value=None"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'status'",
+    "status": "PASS",
+    "detail": "value=todo"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'priority'",
+    "status": "PASS",
+    "detail": "value=medium"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'due_date'",
+    "status": "PASS",
+    "detail": "value=2026-03-10T18:00:00.000Z"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'assignee_id'",
+    "status": "INFO",
+    "detail": "value=None"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'reporter_id'",
+    "status": "PASS",
+    "detail": "value=78db004a-a495-4828-bca0-e0463afbacd2"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'estimated_hours'",
+    "status": "PASS",
+    "detail": "value=6.00"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'actual_hours'",
+    "status": "PASS",
+    "detail": "value=0.00"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'tags'",
+    "status": "PASS",
+    "detail": "value=[]"
+  },
+  {
+    "section": "TASKS",
+    "test": "Field 'created_at'",
+    "status": "PASS",
+    "detail": "value=2026-03-03T18:05:17.924Z"
+  },
+  {
+    "section": "TASKS",
+    "test": "Task deliveries",
+    "status": "PASS",
+    "detail": "0 files"
+  },
+  {
+    "section": "TASKS",
+    "test": "Update task status",
+    "status": "FAIL",
+    "detail": "Status 404"
+  },
+  {
+    "section": "TASKS",
+    "test": "Update task hours",
+    "status": "FAIL",
+    "detail": "Status 404"
+  },
+  {
+    "section": "TASKS",
+    "test": "Create task",
+    "status": "PASS",
+    "detail": "id=a15ecc93-9afa-43d0-a6ab-645a5281d997"
+  },
+  {
+    "section": "TASKS",
+    "test": "Due date saved correctly",
+    "status": "PASS",
+    "detail": "due_date=2026-04-01T00:00:00.000Z"
+  },
+  {
+    "section": "TASKS",
+    "test": "Delete test task",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "DELIVERIES",
+    "test": "List project deliveries",
+    "status": "PASS",
+    "detail": "1 deliveries"
+  },
+  {
+    "section": "DELIVERIES",
+    "test": "Total deliveries across tasks",
+    "status": "INFO",
+    "detail": "2 files"
+  },
+  {
+    "section": "DELIVERIES",
+    "test": "Detail 'Captura de Tela 2026-03-02 a\u0300s 12.12.50.png'",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "DELIVERIES",
+    "test": "  Status/approval",
+    "status": "INFO",
+    "detail": "status=uploaded, requires_approval=True"
+  },
+  {
+    "section": "DELIVERIES",
+    "test": "Detail 'Directors Duozz.pdf'",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "DELIVERIES",
+    "test": "  Status/approval",
+    "status": "INFO",
+    "detail": "status=uploaded, requires_approval=False"
+  },
+  {
+    "section": "TRASH",
+    "test": "Get trash",
+    "status": "PASS",
+    "detail": "2 items"
+  },
+  {
+    "section": "TRASH",
+    "test": "Item types in trash",
+    "status": "INFO",
+    "detail": "types={'project', 'task'}"
+  },
+  {
+    "section": "NOTIFICATIONS",
+    "test": "Get notifications",
+    "status": "PASS",
+    "detail": "0 notifications"
+  },
+  {
+    "section": "NOTIFICATIONS",
+    "test": "Mark all read",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "CALENDAR",
+    "test": "Get events",
+    "status": "PASS",
+    "detail": "0 events"
+  },
+  {
+    "section": "CALENDAR",
+    "test": "Create event",
+    "status": "FAIL",
+    "detail": "Status 400: {\"error\":\"title, start_time, and end_time are required.\"}"
+  },
+  {
+    "section": "COMMENTS",
+    "test": "Get task comments",
+    "status": "FAIL",
+    "detail": "Status 404"
+  },
+  {
+    "section": "COMMENTS",
+    "test": "Create comment",
+    "status": "FAIL",
+    "detail": "Status 404: {\"error\":\"Route POST /api/v1/tasks/83d4ac51-6a42-4b95-b4ef-43395c85d3fd/comments not found.\"}"
+  },
+  {
+    "section": "ADMIN",
+    "test": "Get stats",
+    "status": "PASS",
+    "detail": "data keys: ['total_users', 'total_projects', 'total_tasks', 'total_deliveries', 'total_clients']"
+  },
+  {
+    "section": "ADMIN",
+    "test": "List users",
+    "status": "PASS",
+    "detail": "1 users"
+  },
+  {
+    "section": "ADMIN",
+    "test": "  User 'Admin Demo'",
+    "status": "INFO",
+    "detail": "role=admin, email=demo@duozzflow.com"
+  },
+  {
+    "section": "ADMIN",
+    "test": "Audit log",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "CLIENTS",
+    "test": "List clients",
+    "status": "PASS",
+    "detail": "2 clients"
+  },
+  {
+    "section": "ROUTES",
+    "test": "GET /api/v1/tasks (Global tasks list)",
+    "status": "FAIL",
+    "detail": "Status 404"
+  },
+  {
+    "section": "ROUTES",
+    "test": "GET /api/v1/deliveries (Global deliveries list)",
+    "status": "FAIL",
+    "detail": "Status 404"
+  },
+  {
+    "section": "ROUTES",
+    "test": "GET /api/v1/clients (Clients list)",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "ROUTES",
+    "test": "GET /api/v1/notifications (Notifications)",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "ROUTES",
+    "test": "GET /api/v1/trash (Trash)",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "ROUTES",
+    "test": "GET /api/v1/admin/stats (Admin stats)",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "ROUTES",
+    "test": "GET /api/v1/admin/users (Admin users)",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "ROUTES",
+    "test": "GET /api/v1/admin/audit-log (Audit log)",
+    "status": "PASS",
+    "detail": "Status 200"
+  },
+  {
+    "section": "UPLOAD",
+    "test": "Upload file to task",
+    "status": "PASS",
+    "detail": "id=b0935e9b-b645-41e6-86f7-50c8701dedf3, format=pdf"
+  },
+  {
+    "section": "UPLOAD",
+    "test": "Format auto-detected",
+    "status": "PASS",
+    "detail": "Expected 'pdf', got 'pdf'"
+  },
+  {
+    "section": "UPLOAD",
+    "test": "Download uploaded file",
+    "status": "PASS",
+    "detail": "Status 200, content_length=37"
+  },
+  {
+    "section": "UPLOAD",
+    "test": "Delete test file",
+    "status": "PASS",
+    "detail": "Status 200"
+  }
+]

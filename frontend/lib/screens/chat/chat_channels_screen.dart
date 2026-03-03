@@ -29,26 +29,37 @@ class _ChatChannelsScreenState extends State<ChatChannelsScreen> {
     if (_projectId == null) return;
     setState(() => _initializing = true);
 
-    final chat = context.read<ChatProvider>();
-    chat.joinProject(_projectId!);
-    await chat.loadChannels(_projectId!);
+    try {
+      final chat = context.read<ChatProvider>();
+      chat.joinProject(_projectId!);
+      await chat.loadChannels(_projectId!);
 
-    // Auto-create "Geral" channel if none exist
-    if (chat.channels.isEmpty && mounted) {
-      await chat.createChannel(_projectId!, name: 'Geral');
-    }
+      // Auto-create "Geral" channel if none exist
+      if (chat.channels.isEmpty && mounted) {
+        await chat.createChannel(_projectId!, name: 'Geral');
+      }
 
-    if (!mounted) return;
-    setState(() => _initializing = false);
+      if (!mounted) return;
+      setState(() => _initializing = false);
 
-    // If only one channel, go directly to messages
-    if (chat.channels.length == 1 && mounted) {
-      final channel = chat.channels.first;
-      Navigator.pushReplacementNamed(context, '/chat/messages', arguments: {
-        'channelId': channel.id,
-        'channelName': channel.name,
-        'projectId': _projectId,
-      });
+      // If only one channel, go directly to messages
+      if (chat.channels.length == 1 && mounted) {
+        final channel = chat.channels.first;
+        Navigator.pushReplacementNamed(context, '/chat/messages', arguments: {
+          'channelId': channel.id,
+          'channelName': channel.name,
+          'projectId': _projectId,
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _initializing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao carregar chat: ${e.toString().length > 80 ? e.toString().substring(0, 80) : e}'),
+          action: SnackBarAction(label: 'Tentar novamente', onPressed: _initChat),
+        ),
+      );
     }
   }
 

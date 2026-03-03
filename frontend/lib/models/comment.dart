@@ -26,7 +26,7 @@ class Comment {
       entityId: json['entity_id']?.toString() ?? '',
       userId: json['user_id']?.toString(),
       userName: json['user_name'],
-      userAvatarUrl: json['user_avatar_url'],
+      userAvatarUrl: json['user_avatar_url'] ?? json['user_avatar'],
       content: json['content'] ?? '',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])

@@ -128,17 +128,28 @@ class TaskProvider with ChangeNotifier {
 
   Future<bool> updateTaskStatus(String taskId, String status) async {
     final index = _tasks.indexWhere((t) => t.id == taskId);
-    if (index < 0) return false;
+    Task? oldListTask;
+    Task? oldCurrent;
 
-    final oldTask = _tasks[index];
-    _tasks[index] = oldTask.copyWith(status: status);
+    // Optimistic update in list
+    if (index >= 0) {
+      oldListTask = _tasks[index];
+      _tasks[index] = oldListTask.copyWith(status: status);
+    }
+    // Optimistic update on currentTask
+    if (_currentTask?.id == taskId) {
+      oldCurrent = _currentTask;
+      _currentTask = _currentTask!.copyWith(status: status);
+    }
     notifyListeners();
 
     try {
       await _taskService.updateStatus(taskId, status);
       return true;
     } catch (e) {
-      _tasks[index] = oldTask;
+      // Rollback
+      if (index >= 0 && oldListTask != null) _tasks[index] = oldListTask;
+      if (oldCurrent != null) _currentTask = oldCurrent;
       _errorMessage = _parseError(e);
       notifyListeners();
       return false;

@@ -68,10 +68,38 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     final project = projectProvider.currentProject;
     final auth = context.watch<AuthProvider>();
 
-    if (projectProvider.isLoading || project == null) {
+    if (projectProvider.isLoading) {
       return Scaffold(
         appBar: AppBar(),
         body: const LoadingWidget(message: 'Carregando projeto...'),
+      );
+    }
+
+    if (project == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                projectProvider.errorMessage ?? 'Projeto não encontrado',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  if (_projectId != null) _loadData();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 

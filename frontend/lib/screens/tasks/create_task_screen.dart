@@ -130,6 +130,12 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
     if (success && mounted) {
       Navigator.pop(context);
+    } else if (!success && mounted) {
+      final error = provider.errorMessage ?? 'Erro ao salvar tarefa.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.red[700]),
+      );
+      provider.clearError();
     }
   }
 

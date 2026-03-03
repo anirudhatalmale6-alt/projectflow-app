@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../models/project.dart';
+import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/project_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/delivery_provider.dart';
+import '../../services/api_service.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/task_card.dart';
 import '../../widgets/delivery_card.dart';
@@ -305,12 +308,18 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   Widget? _buildFab(AuthProvider auth) {
     // Show FAB based on active tab
     if (_tabController.index == 0 && auth.canAssignTasks) {
-      // Tarefas tab
       return FloatingActionButton.extended(
         onPressed: () => Navigator.pushNamed(context, '/tasks/create',
             arguments: _projectId),
         icon: const Icon(Icons.add),
         label: const Text('Nova Tarefa'),
+      );
+    }
+    if (_tabController.index == 4 && auth.canManageProjects) {
+      return FloatingActionButton.extended(
+        onPressed: () => _showAddMemberDialog(),
+        icon: const Icon(Icons.person_add),
+        label: const Text('Adicionar'),
       );
     }
     return null;
@@ -453,13 +462,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
 
   Widget _buildTeamTab() {
     final projectProvider = context.watch<ProjectProvider>();
+    final auth = context.watch<AuthProvider>();
     final members = projectProvider.currentMembers;
 
     if (members.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.group_outlined,
         title: 'Nenhum membro',
         subtitle: 'Adicione membros a equipe do projeto',
+        actionLabel: auth.canManageProjects ? 'Adicionar Membro' : null,
+        onAction: auth.canManageProjects ? () => _showAddMemberDialog() : null,
       );
     }
 
@@ -486,8 +498,175 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(member.email),
-            trailing: RoleBadge(role: member.role),
+            trailing: auth.canManageProjects
+                ? PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    onSelected: (value) {
+                      if (value == 'remove') {
+                        _confirmRemoveMember(member);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'role',
+                        enabled: false,
+                        child: Row(
+                          children: [
+                            RoleBadge(role: member.role),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'remove',
+                        child: Row(
+                          children: [
+                            Icon(Icons.person_remove, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Remover', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : RoleBadge(role: member.role),
           ),
+        );
+      },
+    );
+  }
+
+  void _confirmRemoveMember(User member) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remover Membro'),
+        content: Text('Tem certeza que deseja remover "${member.name}" da equipe?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await context.read<ProjectProvider>().removeMember(_projectId!, member.id);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${member.name} removido da equipe')),
+                );
+              }
+            },
+            child: const Text('Remover'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddMemberDialog() async {
+    if (_projectId == null) return;
+    final api = ApiService();
+    List<User> allUsers = [];
+
+    try {
+      final data = await api.get(ApiConfig.adminUsers);
+      final list = data['users'] ?? data['data'] ?? data;
+      allUsers = (list as List).map((json) => User.fromJson(json)).toList();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao carregar usuários')),
+        );
+      }
+      return;
+    }
+
+    final currentMembers = context.read<ProjectProvider>().currentMembers;
+    final memberIds = currentMembers.map((m) => m.id).toSet();
+    final available = allUsers.where((u) => !memberIds.contains(u.id)).toList();
+
+    if (!mounted) return;
+
+    String selectedRole = 'editor';
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Adicionar Membro'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: selectedRole,
+                      decoration: const InputDecoration(
+                        labelText: 'Função no Projeto',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'manager', child: Text('Gerente')),
+                        DropdownMenuItem(value: 'editor', child: Text('Editor')),
+                        DropdownMenuItem(value: 'freelancer', child: Text('Freelancer')),
+                      ],
+                      onChanged: (v) => setDialogState(() => selectedRole = v ?? 'editor'),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Selecione um usuário:', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                    const SizedBox(height: 8),
+                    if (available.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('Todos os usuários já são membros'),
+                      )
+                    else
+                      SizedBox(
+                        height: 250,
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: available.length,
+                          itemBuilder: (ctx, i) {
+                            final user = available[i];
+                            return ListTile(
+                              dense: true,
+                              leading: CircleAvatar(
+                                radius: 18,
+                                backgroundColor: AppTheme.getRoleColor(user.role),
+                                child: Text(user.initials, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                              ),
+                              title: Text(user.name, style: const TextStyle(fontSize: 14)),
+                              subtitle: Text(user.email, style: const TextStyle(fontSize: 12)),
+                              trailing: RoleBadge(role: user.role),
+                              onTap: () async {
+                                Navigator.pop(ctx);
+                                await context.read<ProjectProvider>().addMember(_projectId!, user.id, role: selectedRole);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('${user.name} adicionado à equipe como ${AppTheme.getRoleLabel(selectedRole)}')),
+                                  );
+                                }
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Fechar'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

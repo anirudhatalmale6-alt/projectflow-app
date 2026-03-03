@@ -12,25 +12,32 @@ class ChatProvider with ChangeNotifier {
   List<ChatChannel> _channels = [];
   List<ChatMessage> _messages = [];
   ChatChannel? _currentChannel;
+  String? _currentChannelId;
   String? _currentProjectId;
   bool _isLoading = false;
+  bool _loadingMessages = false;
   String? _errorMessage;
   String? _typingUser;
+  bool _listenersSetUp = false;
 
   List<ChatChannel> get channels => _channels;
   List<ChatMessage> get messages => _messages;
   ChatChannel? get currentChannel => _currentChannel;
   bool get isLoading => _isLoading;
+  bool get loadingMessages => _loadingMessages;
   String? get errorMessage => _errorMessage;
   String? get typingUser => _typingUser;
 
   void _setupSocketListeners() {
+    if (_listenersSetUp) return;
+    _listenersSetUp = true;
+
     _socket.on('chat_message', (data) {
       if (data == null) return;
       try {
         final msgData = data['message'] ?? data;
         final channelId = data['channel_id'] ?? msgData['channel_id'];
-        if (_currentChannel?.id == channelId) {
+        if (_currentChannelId == channelId?.toString()) {
           final msg = ChatMessage.fromJson(msgData is Map<String, dynamic>
               ? msgData
               : Map<String, dynamic>.from(msgData));
@@ -48,7 +55,6 @@ class ChatProvider with ChangeNotifier {
       try {
         _typingUser = data['user_name'] as String?;
         notifyListeners();
-        // Auto-clear after 3 seconds
         Future.delayed(const Duration(seconds: 3), () {
           if (_typingUser == data['user_name']) {
             _typingUser = null;
@@ -79,6 +85,7 @@ class ChatProvider with ChangeNotifier {
     _socket.off('user_stop_typing');
     _currentProjectId = null;
     _typingUser = null;
+    _listenersSetUp = false;
   }
 
   void sendTyping(String channelId) {
@@ -117,8 +124,9 @@ class ChatProvider with ChangeNotifier {
   }
 
   Future<void> loadMessages(String channelId) async {
-    _isLoading = true;
+    _loadingMessages = true;
     _errorMessage = null;
+    _currentChannelId = channelId;
     notifyListeners();
 
     try {
@@ -133,14 +141,13 @@ class ChatProvider with ChangeNotifier {
       _errorMessage = _parseError(e);
     }
 
-    _isLoading = false;
+    _loadingMessages = false;
     notifyListeners();
   }
 
   Future<bool> sendMessage(String channelId, String content) async {
     try {
       final msg = await _service.sendMessage(channelId, content);
-      // Only add if not already added by socket
       final exists = _messages.any((m) => m.id == msg.id);
       if (!exists) {
         _messages.add(msg);
@@ -167,7 +174,6 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
-  /// Ensure a default "Geral" channel exists for a project
   Future<ChatChannel?> ensureDefaultChannel(String projectId) async {
     await loadChannels(projectId);
     if (_channels.isEmpty) {
@@ -177,7 +183,7 @@ class ChatProvider with ChangeNotifier {
   }
 
   void addMessageFromSocket(ChatMessage message) {
-    if (_currentChannel?.id == message.channelId) {
+    if (_currentChannelId == message.channelId) {
       final exists = _messages.any((m) => m.id == message.id);
       if (!exists) {
         _messages.add(message);
@@ -189,7 +195,13 @@ class ChatProvider with ChangeNotifier {
   void clearMessages() {
     _messages = [];
     _currentChannel = null;
+    _currentChannelId = null;
     _typingUser = null;
+    notifyListeners();
+  }
+
+  void clearError() {
+    _errorMessage = null;
     notifyListeners();
   }
 

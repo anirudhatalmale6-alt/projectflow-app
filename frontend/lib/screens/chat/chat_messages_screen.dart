@@ -129,9 +129,34 @@ class _ChatMessagesScreenState extends State<ChatMessagesScreen> {
       body: Column(
         children: [
           Expanded(
-            child: chatProvider.isLoading
+            child: chatProvider.loadingMessages
                 ? const Center(child: CircularProgressIndicator())
-                : chatProvider.messages.isEmpty
+                : chatProvider.errorMessage != null && chatProvider.messages.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+                            const SizedBox(height: 12),
+                            Text(
+                              chatProvider.errorMessage!,
+                              style: TextStyle(color: Colors.grey[600]),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: () {
+                                if (_channelId != null) {
+                                  chatProvider.clearError();
+                                  chatProvider.loadMessages(_channelId!);
+                                }
+                              },
+                              child: const Text('Tentar novamente'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : chatProvider.messages.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,

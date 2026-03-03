@@ -103,9 +103,9 @@ class ProjectProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addMember(String projectId, String userId) async {
+  Future<void> addMember(String projectId, String userId, {String? role}) async {
     try {
-      await _projectService.addMember(projectId, userId);
+      await _projectService.addMember(projectId, userId, role: role);
       _currentMembers = await _projectService.getMembers(projectId);
       notifyListeners();
     } catch (e) {

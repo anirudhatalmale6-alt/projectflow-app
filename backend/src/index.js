@@ -12,6 +12,7 @@ const compression = require('compression');
 
 const errorHandler = require('./middleware/errorHandler');
 const setupSocket = require('./socket');
+const { startDeadlineChecker } = require('./utils/deadlineChecker');
 
 // Route imports
 const authRoutes = require('./routes/auth');
@@ -204,6 +205,9 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Duozz Flow API running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`CORS origin: ${corsOptions.origin}`);
+
+  // Start deadline notification checker (every 30 minutes)
+  startDeadlineChecker(io);
 });
 
 // Graceful shutdown

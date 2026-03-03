@@ -52,7 +52,7 @@ class ProjectService {
   Future<void> addMember(String projectId, String userId, {String? role}) async {
     await _api.post(
       ApiConfig.projectMembers(projectId),
-      body: {'user_id': userId, if (role != null) 'role': role},
+      body: {'userId': userId, if (role != null) 'role': role},
     );
   }
 

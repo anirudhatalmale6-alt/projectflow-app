@@ -188,36 +188,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx'].contains(ext);
   }
 
-  Future<void> _viewDeliveryFile(String deliveryId) async {
-    try {
-      final data = await _api.get(ApiConfig.deliveryDownload(deliveryId));
-      String? url = data['download_url'];
-      if (url == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Nenhum arquivo anexado a esta entrega.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-      if (url.startsWith('/')) {
-        url = '${ApiConfig.baseUrl}$url';
-      }
-      final uri = Uri.parse(url);
-      await launchUrl(uri, mode: LaunchMode.platformDefault);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao abrir arquivo: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+  void _openDeliveryFile(String? fileUrl) {
+    if (fileUrl == null || fileUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nenhum arquivo anexado a esta entrega.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
+    // Construct URL directly (no async API call) to avoid browser popup blocker
+    final url = '${ApiConfig.baseUrl}/uploads/$fileUrl';
+    launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
   }
 
   Future<void> _deleteDelivery(String deliveryId, String title) async {
@@ -834,7 +817,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         InkWell(
-                                          onTap: () => _viewDeliveryFile(d['id']?.toString() ?? ''),
+                                          onTap: () => _openDeliveryFile(d['file_url']?.toString()),
                                           child: Padding(
                                             padding: const EdgeInsets.all(4),
                                             child: Icon(
@@ -937,27 +920,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  Future<void> _downloadDelivery(String deliveryId) async {
-    try {
-      final data = await _api.get(ApiConfig.deliveryDownload(deliveryId));
-      String? url = data['download_url'];
-      if (url != null) {
-        if (url.startsWith('/')) {
-          url = '${ApiConfig.baseUrl}$url';
-        }
-        final uri = Uri.parse(url);
-        await launchUrl(uri, mode: LaunchMode.platformDefault);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao obter download: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
-    }
+  void _downloadDeliveryFile(String? fileUrl) {
+    _openDeliveryFile(fileUrl);
   }
 
   Widget _buildStatusButton(String label, String status, Color color) {

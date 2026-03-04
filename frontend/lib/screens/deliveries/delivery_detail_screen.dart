@@ -27,8 +27,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   bool _loadingComments = false;
   bool _sendingComment = false;
   String? _deliveryId;
-  String? _fileDownloadUrl;
-  bool _loadingFileUrl = false;
   final _reviewNotesController = TextEditingController();
 
   @override
@@ -39,7 +37,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
       _deliveryId = id;
       context.read<DeliveryProvider>().loadDelivery(id);
       _loadComments();
-      _loadFileUrl(id);
     }
   }
 
@@ -59,20 +56,9 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     setState(() => _loadingComments = false);
   }
 
-  Future<void> _loadFileUrl(String id) async {
-    setState(() => _loadingFileUrl = true);
-    try {
-      final data = await _api.get(ApiConfig.deliveryDownload(id));
-      String? url = data['download_url'];
-      // For local uploads, resolve relative URL against base
-      if (url != null && url.startsWith('/')) {
-        url = '${ApiConfig.baseUrl}$url';
-      }
-      setState(() => _fileDownloadUrl = url);
-    } catch (_) {
-      setState(() => _fileDownloadUrl = null);
-    }
-    setState(() => _loadingFileUrl = false);
+  String? _getFileDownloadUrl(String? fileUrl) {
+    if (fileUrl == null || fileUrl.isEmpty) return null;
+    return '${ApiConfig.baseUrl}/uploads/$fileUrl';
   }
 
   String? _resolveFormat(String? format, String? title) {
@@ -98,10 +84,9 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].contains(f);
   }
 
-  Future<void> _openFile() async {
-    if (_fileDownloadUrl == null) return;
-    final uri = Uri.parse(_fileDownloadUrl!);
-    await launchUrl(uri, mode: LaunchMode.platformDefault);
+  void _openFile(String? url) {
+    if (url == null) return;
+    launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
   }
 
   Future<void> _addComment(String content) async {
@@ -227,30 +212,25 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                         color: AppTheme.secondaryColor.withOpacity(0.2),
                       ),
                     ),
-                    child: _loadingFileUrl
-                        ? const SizedBox(
-                            height: 200,
-                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                          )
-                        : _isImage(delivery.format, delivery.title) && _fileDownloadUrl != null
+                    child: _isImage(delivery.format, delivery.title) && _getFileDownloadUrl(delivery.fileUrl) != null
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
                                 child: Image.network(
-                                  _fileDownloadUrl!,
+                                  _getFileDownloadUrl(delivery.fileUrl)!,
                                   fit: BoxFit.contain,
                                   errorBuilder: (_, __, ___) => _buildFilePlaceholder(delivery),
                                 ),
                               )
                             : _buildFilePlaceholder(delivery),
                   ),
-                  if (_fileDownloadUrl != null) ...[
+                  if (_getFileDownloadUrl(delivery.fileUrl) != null) ...[
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         if (_isPreviewable(delivery.format, delivery.title))
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: _openFile,
+                              onPressed: () => _openFile(_getFileDownloadUrl(delivery.fileUrl)),
                               icon: const Icon(Icons.visibility_outlined),
                               label: const Text('Visualizar'),
                               style: OutlinedButton.styleFrom(
@@ -264,7 +244,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                           const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _openFile,
+                            onPressed: () => _openFile(_getFileDownloadUrl(delivery.fileUrl)),
                             icon: const Icon(Icons.download_outlined),
                             label: const Text('Baixar'),
                             style: OutlinedButton.styleFrom(

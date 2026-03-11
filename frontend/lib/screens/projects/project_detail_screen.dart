@@ -1106,43 +1106,86 @@ class _InlineChatWidgetState extends State<_InlineChatWidget> {
   }
 
   Widget _buildMessage(ChatMessage msg, bool isMe, bool showName) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(
-          bottom: 4,
-          top: showName ? 12 : 2,
-          left: isMe ? 60 : 0,
-          right: isMe ? 0 : 60,
-        ),
-        child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            if (showName)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4, left: 12),
-                child: Text(
-                  msg.userName ?? 'Usuario',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryColor),
-                ),
-              ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isMe ? AppTheme.primaryColor : Colors.grey[200],
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 16),
-                ),
-              ),
-              child: Text(
-                msg.content,
-                style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 14),
-              ),
-            ),
+    final avatar = _buildAvatar(msg, isMe, showName);
+
+    return Container(
+      margin: EdgeInsets.only(
+        bottom: 4,
+        top: showName ? 12 : 2,
+      ),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            showName
+                ? avatar
+                : const SizedBox(width: 36),
+            const SizedBox(width: 8),
           ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (showName)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4, left: 4),
+                    child: Text(
+                      msg.userName ?? 'Usuario',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryColor),
+                    ),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isMe ? AppTheme.primaryColor : Colors.grey[200],
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(isMe ? 16 : 4),
+                      bottomRight: Radius.circular(isMe ? 4 : 16),
+                    ),
+                  ),
+                  child: Text(
+                    msg.content,
+                    style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isMe) ...[
+            const SizedBox(width: 8),
+            showName
+                ? avatar
+                : const SizedBox(width: 36),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(ChatMessage msg, bool isMe, bool showName) {
+    final name = msg.userName ?? '?';
+    final initials = name.split(' ').where((w) => w.isNotEmpty).take(2).map((w) => w[0].toUpperCase()).join();
+    final avatarUrl = msg.userAvatar;
+
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 16,
+        backgroundImage: NetworkImage(avatarUrl),
+        backgroundColor: Colors.grey[300],
+      );
+    }
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: isMe ? AppTheme.primaryColor.withAlpha(40) : Colors.grey[300],
+      child: Text(
+        initials.isEmpty ? '?' : initials,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: isMe ? AppTheme.primaryColor : Colors.grey[700],
         ),
       ),
     );

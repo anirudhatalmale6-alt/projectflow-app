@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiConfig {
-  static const String _serverUrl = 'https://same-efficient-another-travis.trycloudflare.com';
+  static const String _serverUrl = 'https://nokia-uniprotkb-mins-norm.trycloudflare.com';
 
   static Future<void> loadConfig() async {
     // Using hardcoded HTTPS URL

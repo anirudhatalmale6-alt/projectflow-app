@@ -28,6 +28,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   List<String> _tags = [];
   bool _isEditing = false;
   String? _editId;
+  bool _saving = false;
 
   @override
   void didChangeDependencies() {
@@ -104,7 +105,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _saving) return;
+
+    setState(() => _saving = true);
 
     final provider = context.read<TaskProvider>();
     final data = {
@@ -120,22 +123,32 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       'tags': _tags,
     };
 
-    bool success;
-    if (_isEditing) {
-      success = await provider.updateTask(_editId!, data);
-    } else {
-      final task = await provider.createTask(data);
-      success = task != null;
-    }
+    try {
+      bool success;
+      if (_isEditing) {
+        success = await provider.updateTask(_editId!, data);
+      } else {
+        final task = await provider.createTask(data);
+        success = task != null;
+      }
 
-    if (success && mounted) {
-      Navigator.pop(context);
-    } else if (!success && mounted) {
-      final error = provider.errorMessage ?? 'Erro ao salvar tarefa.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.red[700]),
-      );
-      provider.clearError();
+      if (success && mounted) {
+        Navigator.pop(context);
+      } else if (!success && mounted) {
+        final error = provider.errorMessage ?? 'Erro ao salvar tarefa.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: Colors.red[700]),
+        );
+        provider.clearError();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red[700]),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -150,7 +163,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         title: Text(_isEditing ? 'Editar Tarefa' : 'Nova Tarefa'),
       ),
       body: LoadingOverlay(
-        isLoading: taskProvider.isLoading,
+        isLoading: _saving,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Form(

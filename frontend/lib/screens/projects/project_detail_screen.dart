@@ -310,7 +310,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     if (_tabController.index == 0 && auth.canAssignTasks) {
       return FloatingActionButton.extended(
         onPressed: () => Navigator.pushNamed(context, '/tasks/create',
-            arguments: _projectId),
+            arguments: _projectId).then((_) {
+          context.read<TaskProvider>().loadTasks(projectId: _projectId);
+        }),
         icon: const Icon(Icons.add),
         label: const Text('Nova Tarefa'),
       );
@@ -405,7 +407,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         actionLabel: auth.canAssignTasks ? 'Criar Tarefa' : null,
         onAction: auth.canAssignTasks
             ? () => Navigator.pushNamed(context, '/tasks/create',
-                arguments: _projectId)
+                arguments: _projectId).then((_) {
+                context.read<TaskProvider>().loadTasks(projectId: _projectId);
+              })
             : null,
       );
     }

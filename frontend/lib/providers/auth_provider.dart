@@ -149,6 +149,13 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<void> refreshProfile() async {
+    try {
+      _user = await _authService.me();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   void clearError() {
     _errorMessage = null;
     if (_state == AuthState.error) {

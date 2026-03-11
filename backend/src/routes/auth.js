@@ -1,10 +1,13 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const pool = require('../config/database');
 const { logAudit, getClientIp } = require('../utils/audit');
+const { upload } = require('../middleware/upload');
 
 const passport = require('passport');
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
@@ -361,6 +364,36 @@ router.put('/profile', auth, async (req, res, next) => {
     res.json({
       message: 'Profile updated successfully.',
       user,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/auth/profile/avatar - Upload avatar photo
+router.post('/profile/avatar', auth, upload.single('avatar'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+
+    const uploadsDir = process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'uploads');
+    const avatarsDir = path.join(uploadsDir, 'avatars');
+    fs.mkdirSync(avatarsDir, { recursive: true });
+
+    const ext = path.extname(req.file.originalname) || '.jpg';
+    const filename = `${req.user.id}-${Date.now()}${ext}`;
+    const filePath = path.join(avatarsDir, filename);
+
+    fs.writeFileSync(filePath, req.file.buffer);
+
+    const avatarUrl = `avatars/${filename}`;
+    const user = await User.update(req.user.id, { avatar_url: avatarUrl });
+
+    res.json({
+      message: 'Avatar updated successfully.',
+      user,
+      avatar_url: avatarUrl,
     });
   } catch (err) {
     next(err);

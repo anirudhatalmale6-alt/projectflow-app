@@ -247,4 +247,20 @@ class ApiService {
     final response = await http.Response.fromStream(streamedResponse);
     return _handleResponse(response);
   }
+
+  Future<dynamic> uploadFile(
+    String path,
+    List<int> bytes,
+    String fileName, {
+    String fieldName = 'file',
+    Map<String, String>? fields,
+  }) async {
+    return multipartPostBytes(
+      path,
+      fields: fields ?? {},
+      fileBytes: bytes,
+      fileName: fileName,
+      fileField: fieldName,
+    );
+  }
 }

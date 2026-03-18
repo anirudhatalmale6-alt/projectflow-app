@@ -23,7 +23,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
   String _priority = 'medium';
   DateTime? _dueDate;
-  String? _assigneeId;
+  List<String> _assigneeIds = [];
   String? _projectId;
   List<String> _tags = [];
   bool _isEditing = false;
@@ -44,7 +44,10 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           arg.estimatedHours?.toStringAsFixed(1) ?? '';
       _priority = arg.priority;
       _dueDate = arg.dueDate;
-      _assigneeId = arg.assigneeId;
+      _assigneeIds = arg.assignees.map((a) => a.id).toList();
+      if (_assigneeIds.isEmpty && arg.assigneeId != null) {
+        _assigneeIds = [arg.assigneeId!];
+      }
       _tags = List.from(arg.tags);
     } else if (arg is String && _projectId == null) {
       _projectId = arg;
@@ -115,7 +118,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
       'priority': _priority,
-      if (_assigneeId != null) 'assigneeId': _assigneeId,
+      if (_assigneeIds.isNotEmpty) 'assigneeId': _assigneeIds.first,
+      'assigneeIds': _assigneeIds,
       if (_dueDate != null) 'dueDate': _dueDate!.toIso8601String(),
       if (_estimatedHoursController.text.isNotEmpty)
         'estimatedHours':
@@ -213,27 +217,52 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                       setState(() => _priority = value ?? 'medium'),
                 ),
                 const SizedBox(height: 16),
-                // Assignee
-                DropdownButtonFormField<String>(
-                  value: _assigneeId,
+                // Assignees (multi-select)
+                InputDecorator(
                   decoration: const InputDecoration(
-                    labelText: 'Responsavel',
-                    prefixIcon: Icon(Icons.person_outlined),
+                    labelText: 'Responsaveis',
+                    prefixIcon: Icon(Icons.people_outlined),
                   ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Nao atribuido'),
-                    ),
-                    ...members.map((m) {
-                      return DropdownMenuItem(
-                        value: m.id,
-                        child: Text('${m.name} (${AppTheme.getRoleLabel(m.role)})'),
-                      );
-                    }),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _assigneeId = value),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_assigneeIds.isNotEmpty)
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: _assigneeIds.map((id) {
+                            final member = members.where((m) => m.id == id).toList();
+                            final name = member.isNotEmpty ? member.first.name : 'Membro';
+                            return Chip(
+                              label: Text(name, style: const TextStyle(fontSize: 13)),
+                              avatar: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: AppTheme.primaryColor,
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                  style: const TextStyle(fontSize: 10, color: Colors.white),
+                                ),
+                              ),
+                              onDeleted: () => setState(() => _assigneeIds.remove(id)),
+                              deleteIconColor: AppTheme.textSecondary,
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: members
+                            .where((m) => !_assigneeIds.contains(m.id))
+                            .map((m) => ActionChip(
+                                  avatar: const Icon(Icons.add, size: 16),
+                                  label: Text(m.name, style: const TextStyle(fontSize: 13)),
+                                  onPressed: () => setState(() => _assigneeIds.add(m.id)),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 // Due date

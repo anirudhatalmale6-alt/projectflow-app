@@ -493,10 +493,60 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     ),
                     child: Column(
                       children: [
-                        _buildInfoRow(
-                          Icons.person_outlined,
-                          'Responsavel',
-                          task.assigneeName ?? 'Nao atribuido',
+                        // Multiple assignees display
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.people_outlined, size: 18, color: AppTheme.textSecondary),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              flex: 2,
+                              child: Text(
+                                'Responsáveis',
+                                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: task.assignees.isNotEmpty
+                                  ? Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: task.assignees.map((a) {
+                                        return Chip(
+                                          avatar: CircleAvatar(
+                                            radius: 12,
+                                            backgroundColor: AppTheme.primaryColor,
+                                            backgroundImage: a.avatarUrl != null && a.avatarUrl!.isNotEmpty
+                                                ? NetworkImage(
+                                                    a.avatarUrl!.startsWith('http')
+                                                        ? a.avatarUrl!
+                                                        : '${ApiConfig.baseUrl}/uploads/${a.avatarUrl}',
+                                                  )
+                                                : null,
+                                            child: a.avatarUrl == null || a.avatarUrl!.isEmpty
+                                                ? Text(
+                                                    a.name.isNotEmpty ? a.name[0].toUpperCase() : '?',
+                                                    style: const TextStyle(fontSize: 10, color: Colors.white),
+                                                  )
+                                                : null,
+                                          ),
+                                          label: Text(a.name, style: const TextStyle(fontSize: 12)),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          visualDensity: VisualDensity.compact,
+                                        );
+                                      }).toList(),
+                                    )
+                                  : Text(
+                                      task.assigneeName ?? 'Não atribuído',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    ),
+                            ),
+                          ],
                         ),
                         const Divider(height: 20),
                         _buildInfoRow(

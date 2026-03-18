@@ -1,3 +1,21 @@
+class TaskAssignee {
+  final String id;
+  final String name;
+  final String? email;
+  final String? avatarUrl;
+
+  TaskAssignee({required this.id, required this.name, this.email, this.avatarUrl});
+
+  factory TaskAssignee.fromJson(Map<String, dynamic> json) {
+    return TaskAssignee(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      email: json['email'],
+      avatarUrl: json['avatar_url'],
+    );
+  }
+}
+
 class Task {
   final String id;
   final String projectId;
@@ -7,6 +25,7 @@ class Task {
   final String priority;
   final String? assigneeId;
   final String? assigneeName;
+  final List<TaskAssignee> assignees;
   final DateTime? dueDate;
   final double? estimatedHours;
   final double? actualHours;
@@ -24,6 +43,7 @@ class Task {
     this.priority = 'medium',
     this.assigneeId,
     this.assigneeName,
+    this.assignees = const [],
     this.dueDate,
     this.estimatedHours,
     this.actualHours,
@@ -43,6 +63,9 @@ class Task {
       priority: json['priority'] ?? 'medium',
       assigneeId: json['assignee_id']?.toString(),
       assigneeName: json['assignee_name'],
+      assignees: json['assignees'] != null
+          ? (json['assignees'] as List).map((a) => TaskAssignee.fromJson(a)).toList()
+          : [],
       dueDate:
           json['due_date'] != null ? DateTime.tryParse(json['due_date']) : null,
       estimatedHours: json['estimated_hours'] != null
@@ -95,6 +118,7 @@ class Task {
     String? priority,
     String? assigneeId,
     String? assigneeName,
+    List<TaskAssignee>? assignees,
     DateTime? dueDate,
     double? estimatedHours,
     double? actualHours,
@@ -110,6 +134,7 @@ class Task {
       priority: priority ?? this.priority,
       assigneeId: assigneeId ?? this.assigneeId,
       assigneeName: assigneeName ?? this.assigneeName,
+      assignees: assignees ?? this.assignees,
       dueDate: dueDate ?? this.dueDate,
       estimatedHours: estimatedHours ?? this.estimatedHours,
       actualHours: actualHours ?? this.actualHours,

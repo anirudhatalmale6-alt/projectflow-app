@@ -1,5 +1,40 @@
 const pool = require('../config/database');
 
+// Helper: parse tags from JSON string to array (MySQL stores JSON, PG used TEXT[])
+function parseTags(rows) {
+  if (!rows) return rows;
+  for (const row of rows) {
+    if (row.tags && typeof row.tags === 'string') {
+      try { row.tags = JSON.parse(row.tags); } catch (_) { row.tags = []; }
+    }
+    if (row.tags === null || row.tags === undefined) row.tags = [];
+  }
+  return rows;
+}
+
+// Helper: fetch assignees for tasks
+async function enrichWithAssignees(tasks) {
+  if (!tasks || tasks.length === 0) return tasks;
+  const taskIds = tasks.map(t => t.id);
+  const { rows: assignees } = await pool.query(
+    `SELECT ta.task_id, u.id, u.name, u.email, u.avatar_url
+     FROM task_assignees ta
+     JOIN users u ON ta.user_id = u.id
+     WHERE ta.task_id = ANY($1)
+     ORDER BY ta.assigned_at ASC`,
+    [taskIds]
+  );
+  const map = {};
+  for (const a of assignees) {
+    if (!map[a.task_id]) map[a.task_id] = [];
+    map[a.task_id].push({ id: a.id, name: a.name, email: a.email, avatar_url: a.avatar_url });
+  }
+  for (const t of tasks) {
+    t.assignees = map[t.id] || [];
+  }
+  return tasks;
+}
+
 const Task = {
   async create({ projectId, title, description, status = 'todo', priority = 'medium', assigneeId, reporterId, dueDate, parentTaskId, estimatedHours, tags }) {
     // Get the next position for this status column
@@ -17,10 +52,10 @@ const Task = {
       [
         projectId, title, description || null, status, priority,
         assigneeId || null, reporterId, dueDate || null, position,
-        parentTaskId || null, estimatedHours || null, tags || null,
+        parentTaskId || null, estimatedHours || null, tags ? JSON.stringify(tags) : null,
       ]
     );
-
+    parseTags(rows);
     return rows[0];
   },
 
@@ -37,7 +72,10 @@ const Task = {
        WHERE t.id = $1 AND t.deleted_at IS NULL`,
       [id]
     );
-    return rows[0] || null;
+    if (rows.length === 0) return null;
+    parseTags(rows);
+    await enrichWithAssignees(rows);
+    return rows[0];
   },
 
   async findByProjectId(projectId, { status, assigneeId, priority, search } = {}) {
@@ -83,6 +121,8 @@ const Task = {
     query += ' ORDER BY t.status, t.position ASC, t.created_at DESC';
 
     const { rows } = await pool.query(query, values);
+    parseTags(rows);
+    await enrichWithAssignees(rows);
     return rows;
   },
 
@@ -97,7 +137,8 @@ const Task = {
       const value = fields[camelKey] !== undefined ? fields[camelKey] : fields[key];
       if (value !== undefined) {
         setClauses.push(`${key} = $${paramIndex}`);
-        values.push(value === '' ? null : value);
+        const v = value === '' ? null : value;
+        values.push(key === 'tags' && Array.isArray(v) ? JSON.stringify(v) : v);
         paramIndex++;
       }
     }
@@ -254,7 +295,7 @@ const Task = {
       values.push(status);
     }
 
-    query += ' ORDER BY t.due_date ASC NULLS LAST, t.priority DESC, t.created_at DESC';
+    query += ' ORDER BY CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END, t.due_date ASC, t.priority DESC, t.created_at DESC';
 
     const { rows } = await pool.query(query, values);
     return rows;
@@ -265,5 +306,7 @@ const Task = {
     return rows[0].count;
   },
 };
+
+Task.enrichWithAssignees = enrichWithAssignees;
 
 module.exports = Task;

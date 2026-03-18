@@ -1171,9 +1171,12 @@ class _InlineChatWidgetState extends State<_InlineChatWidget> {
     final avatarUrl = msg.userAvatar;
 
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      final fullUrl = avatarUrl.startsWith('http')
+          ? avatarUrl
+          : '${ApiConfig.baseUrl}/uploads/$avatarUrl';
       return CircleAvatar(
         radius: 16,
-        backgroundImage: NetworkImage(avatarUrl),
+        backgroundImage: NetworkImage(fullUrl),
         backgroundColor: Colors.grey[300],
       );
     }

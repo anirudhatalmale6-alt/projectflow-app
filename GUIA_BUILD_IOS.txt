@@ -1,0 +1,138 @@
+==============================================
+GUIA - COMPILAR E PUBLICAR DUOZZ FLOW NA APP STORE
+==============================================
+
+PRE-REQUISITOS:
+- Mac com macOS 14+ (Sonoma ou superior)
+- Xcode 15+ instalado (baixe na App Store)
+- Conta Apple Developer ativa ($99/ano)
+- Flutter SDK instalado
+
+----------------------------------------------
+PASSO 1: INSTALAR FLUTTER NO MAC
+----------------------------------------------
+
+Abra o Terminal e execute:
+
+  git clone https://github.com/flutter/flutter.git -b stable ~/flutter
+  export PATH="$HOME/flutter/bin:$PATH"
+  echo 'export PATH="$HOME/flutter/bin:$PATH"' >> ~/.zshrc
+  flutter doctor
+
+Verifique que aparece [OK] para Flutter e Xcode.
+Se Xcode pedir, aceite a licenca:
+
+  sudo xcodebuild -license accept
+
+----------------------------------------------
+PASSO 2: BAIXAR O PROJETO
+----------------------------------------------
+
+  git clone https://github.com/anirudhatalmale6-alt/projectflow-app.git
+  cd projectflow-app/frontend
+  flutter pub get
+
+----------------------------------------------
+PASSO 3: ABRIR NO XCODE
+----------------------------------------------
+
+  cd ios
+  pod install
+  open Runner.xcworkspace
+
+IMPORTANTE: Abra o arquivo .xcworkspace (NAO o .xcodeproj)
+
+----------------------------------------------
+PASSO 4: CONFIGURAR SIGNING NO XCODE
+----------------------------------------------
+
+1. No Xcode, clique em "Runner" no painel esquerdo
+2. Clique na aba "Signing & Capabilities"
+3. Marque "Automatically manage signing"
+4. Em "Team", selecione sua conta Apple Developer
+5. O Bundle Identifier deve ser: com.duozz.flow
+6. Verifique que nao ha erros de signing
+
+----------------------------------------------
+PASSO 5: COMPILAR O APP
+----------------------------------------------
+
+No Terminal, dentro da pasta frontend/:
+
+  flutter build ios --release
+
+Isso gera o build otimizado para iOS.
+
+----------------------------------------------
+PASSO 6: CRIAR ARCHIVE E ENVIAR PARA APP STORE
+----------------------------------------------
+
+1. No Xcode, selecione "Any iOS Device" como destino (nao simulador)
+2. Menu: Product > Archive
+3. Aguarde a compilacao terminar
+4. Na janela do Organizer que abre:
+   - Clique em "Distribute App"
+   - Selecione "App Store Connect"
+   - Clique "Next" e siga as instrucoes
+   - Clique "Upload"
+
+----------------------------------------------
+PASSO 7: CONFIGURAR NO APP STORE CONNECT
+----------------------------------------------
+
+1. Acesse: https://appstoreconnect.apple.com
+2. Clique em "My Apps" > "+" > "New App"
+3. Preencha:
+   - Plataforma: iOS
+   - Nome: Duozz Flow
+   - Bundle ID: com.duozz.flow
+   - SKU: duozzflow
+   - Idioma principal: Portugues (Brasil)
+
+4. Na pagina do app:
+   - Descricao: (copie a descricao longa que voce preparou)
+   - Palavras-chave: gestao de projetos, produtora, workflow, tarefas, equipe, producao de video, gerenciamento
+   - URL de suporte: https://duozzflow.com
+   - Categoria: Produtividade (ou Negocios)
+
+5. Screenshots:
+   - Tire prints do app rodando no simulador do Xcode
+   - iPhone 6.7" (iPhone 15 Pro Max): 1290 x 2796
+   - iPhone 6.5" (iPhone 14 Plus): 1284 x 2778
+   - iPad 12.9": 2048 x 2732
+
+   Para tirar prints no simulador:
+   - flutter run (com simulador aberto)
+   - No simulador: Cmd + S salva screenshot
+
+6. Icone: ja esta configurado no projeto (1024x1024)
+
+7. Em "Build", selecione o build que voce enviou no Passo 6
+
+8. Clique "Submit for Review"
+
+----------------------------------------------
+PASSO 8: AGUARDAR REVISAO DA APPLE
+----------------------------------------------
+
+A Apple revisa o app em 24-48 horas (geralmente).
+Voce recebe email quando for aprovado ou se pedirem alguma alteracao.
+
+----------------------------------------------
+DUVIDAS FREQUENTES:
+----------------------------------------------
+
+P: "Provisioning profile" erro?
+R: No Xcode, va em Signing & Capabilities e marque "Automatically manage signing"
+
+P: Pod install falhou?
+R: Execute: sudo gem install cocoapods && pod install
+
+P: Flutter nao reconhecido?
+R: Execute: export PATH="$HOME/flutter/bin:$PATH"
+
+P: Preciso de URL de politica de privacidade?
+R: Sim, a Apple exige. Posso criar uma pagina simples em duozzflow.com/privacy
+
+----------------------------------------------
+Se tiver qualquer duvida durante o processo, me mande mensagem!

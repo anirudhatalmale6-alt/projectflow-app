@@ -94,26 +94,49 @@ router.post('/projects/:projectId/tasks', requireProjectRole('manager', 'editor'
       tags: tags || null,
     });
 
-    // Notify assignee if different from reporter
-    if (assigneeId && assigneeId !== req.user.id) {
-      const project = await Project.findById(projectId);
-      await Notification.create({
-        userId: assigneeId,
-        type: 'task_assigned',
-        title: `New task assigned: "${task.title}"`,
-        message: `${req.user.name} assigned you a task in "${project.name}".`,
-        referenceId: task.id,
-        referenceType: 'task',
-      });
+    // Handle multiple assignees via junction table
+    const { assigneeIds } = req.body;
+    const idsToAssign = assigneeIds && Array.isArray(assigneeIds) && assigneeIds.length > 0
+      ? assigneeIds
+      : (assigneeId ? [assigneeId] : []);
 
-      const io = req.app.get('io');
-      if (io) {
-        io.to(`user:${assigneeId}`).emit('notification', {
+    for (const uid of idsToAssign) {
+      await pool.query(
+        'INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [task.id, uid]
+      );
+    }
+
+    // Set legacy assignee_id to first assignee for backwards compat
+    if (idsToAssign.length > 0 && !assigneeId) {
+      await pool.query('UPDATE tasks SET assignee_id = $1 WHERE id = $2', [idsToAssign[0], task.id]);
+    }
+
+    // Enrich task with assignees before returning
+    const enriched = await Task.enrichWithAssignees([task]);
+    const taskWithAssignees = enriched[0] || task;
+
+    // Notify all assignees
+    const project = await Project.findById(projectId);
+    const io = req.app.get('io');
+    for (const uid of idsToAssign) {
+      if (uid !== req.user.id) {
+        await Notification.create({
+          userId: uid,
           type: 'task_assigned',
           title: `New task assigned: "${task.title}"`,
-          task_id: task.id,
+          message: `${req.user.name} assigned you a task in "${project.name}".`,
+          referenceId: task.id,
+          referenceType: 'task',
         });
-        io.to(`user:${assigneeId}`).emit('task_assigned', task);
+        if (io) {
+          io.to(`user:${uid}`).emit('notification', {
+            type: 'task_assigned',
+            title: `New task assigned: "${task.title}"`,
+            task_id: task.id,
+          });
+          io.to(`user:${uid}`).emit('task_assigned', taskWithAssignees);
+        }
       }
     }
 
@@ -126,12 +149,11 @@ router.post('/projects/:projectId/tasks', requireProjectRole('manager', 'editor'
       ipAddress: getClientIp(req),
     });
 
-    const io = req.app.get('io');
     if (io) {
-      io.to(`project:${projectId}`).emit('task_created', task);
+      io.to(`project:${projectId}`).emit('task_created', taskWithAssignees);
     }
 
-    res.status(201).json({ task });
+    res.status(201).json({ task: taskWithAssignees });
   } catch (err) {
     next(err);
   }
@@ -241,6 +263,29 @@ router.put('/tasks/:id', async (req, res, next) => {
 
     const updated = await Task.update(req.params.id, updates);
 
+    // Sync multiple assignees if provided
+    const { assigneeIds } = req.body;
+    if (assigneeIds && Array.isArray(assigneeIds)) {
+      // Remove all existing assignees and re-add
+      await pool.query('DELETE FROM task_assignees WHERE task_id = $1', [req.params.id]);
+      for (const uid of assigneeIds) {
+        await pool.query(
+          'INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [req.params.id, uid]
+        );
+      }
+      // Update legacy assignee_id
+      if (assigneeIds.length > 0) {
+        await pool.query('UPDATE tasks SET assignee_id = $1 WHERE id = $2', [assigneeIds[0], req.params.id]);
+      } else {
+        await pool.query('UPDATE tasks SET assignee_id = NULL WHERE id = $2', [req.params.id]);
+      }
+    }
+
+    // Enrich with assignees
+    const enrichedArr = await Task.enrichWithAssignees([updated]);
+    const enrichedTask = enrichedArr[0] || updated;
+
     // Notify on assignment change
     if (assigneeId && assigneeId !== task.assignee_id && assigneeId !== req.user.id) {
       const project = await Project.findById(task.project_id);
@@ -305,12 +350,12 @@ router.put('/tasks/:id', async (req, res, next) => {
       ipAddress: getClientIp(req),
     });
 
-    const io = req.app.get('io');
-    if (io) {
-      io.to(`project:${task.project_id}`).emit('task_updated', updated);
+    const io2 = req.app.get('io');
+    if (io2) {
+      io2.to(`project:${task.project_id}`).emit('task_updated', enrichedTask);
     }
 
-    res.json({ task: updated });
+    res.json({ task: enrichedTask });
   } catch (err) {
     next(err);
   }
@@ -519,5 +564,110 @@ const positionHandler = async (req, res, next) => {
 };
 router.put('/tasks/:id/position', positionHandler);
 router.patch('/tasks/:id/position', positionHandler);
+
+// POST /api/v1/tasks/:id/assignees - add assignees to task
+router.post('/tasks/:id/assignees', async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found.' });
+
+    const { userIds } = req.body;
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'userIds array is required.' });
+    }
+
+    for (const userId of userIds) {
+      await pool.query(
+        'INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [req.params.id, userId]
+      );
+    }
+
+    // Also set first assignee as the legacy assignee_id for backwards compat
+    if (!task.assignee_id && userIds.length > 0) {
+      await pool.query('UPDATE tasks SET assignee_id = $1 WHERE id = $2', [userIds[0], req.params.id]);
+    }
+
+    // Fetch updated assignees
+    const { rows: assignees } = await pool.query(
+      `SELECT u.id, u.name, u.email, u.avatar_url
+       FROM task_assignees ta JOIN users u ON ta.user_id = u.id
+       WHERE ta.task_id = $1 ORDER BY ta.assigned_at`,
+      [req.params.id]
+    );
+
+    // Notify new assignees
+    const io = req.app.get('io');
+    for (const userId of userIds) {
+      if (userId !== req.user.id) {
+        await Notification.create({
+          userId,
+          type: 'task_assigned',
+          title: `Tarefa atribuída: "${task.title}"`,
+          message: `${req.user.name} atribuiu você a uma tarefa.`,
+          referenceId: task.id,
+          referenceType: 'task',
+        });
+        if (io) {
+          io.to(`user:${userId}`).emit('notification', { type: 'task_assigned', task_id: task.id });
+        }
+      }
+    }
+
+    res.json({ assignees });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/v1/tasks/:id/assignees/:userId - remove assignee from task
+router.delete('/tasks/:id/assignees/:userId', async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found.' });
+
+    await pool.query(
+      'DELETE FROM task_assignees WHERE task_id = $1 AND user_id = $2',
+      [req.params.id, req.params.userId]
+    );
+
+    // If removed user was the legacy assignee, update to next assignee or null
+    if (task.assignee_id === req.params.userId) {
+      const { rows } = await pool.query(
+        'SELECT user_id FROM task_assignees WHERE task_id = $1 ORDER BY assigned_at LIMIT 1',
+        [req.params.id]
+      );
+      await pool.query('UPDATE tasks SET assignee_id = $1 WHERE id = $2',
+        [rows.length > 0 ? rows[0].user_id : null, req.params.id]);
+    }
+
+    // Fetch updated assignees
+    const { rows: assignees } = await pool.query(
+      `SELECT u.id, u.name, u.email, u.avatar_url
+       FROM task_assignees ta JOIN users u ON ta.user_id = u.id
+       WHERE ta.task_id = $1 ORDER BY ta.assigned_at`,
+      [req.params.id]
+    );
+
+    res.json({ assignees });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/tasks/:id/assignees - list assignees
+router.get('/tasks/:id/assignees', async (req, res, next) => {
+  try {
+    const { rows: assignees } = await pool.query(
+      `SELECT u.id, u.name, u.email, u.avatar_url
+       FROM task_assignees ta JOIN users u ON ta.user_id = u.id
+       WHERE ta.task_id = $1 ORDER BY ta.assigned_at`,
+      [req.params.id]
+    );
+    res.json({ assignees });
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;

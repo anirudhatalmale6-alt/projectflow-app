@@ -49,15 +49,29 @@
     <p>Loading Duozz Flow...</p>
   </div>
   <script>
-    // Disable service worker caching for development
+    // Disable service worker caching
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (let registration of registrations) {
           registration.unregister();
         }
       });
+      // Also clear all caches
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (let name of names) caches.delete(name);
+        });
+      }
     }
+    // Loading timeout - reload if stuck for 15 seconds
+    setTimeout(function() {
+      var el = document.getElementById('loading');
+      if (el && el.style.display !== 'none') {
+        el.querySelector('p').textContent = 'Recarregando...';
+        location.reload();
+      }
+    }, 15000);
   </script>
-  <script src="flutter_bootstrap.js?v=1711b" async></script>
+  <script src="flutter_bootstrap.js?v=20260311b" async></script>
 </body>
 </html>

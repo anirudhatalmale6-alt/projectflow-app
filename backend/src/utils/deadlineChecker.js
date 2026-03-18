@@ -12,7 +12,7 @@ async function checkDeadlines(io) {
     // 1. Check overdue projects (deadline passed, not completed)
     const { rows: overdueProjects } = await pool.query(`
       SELECT p.id, p.name, p.deadline,
-             ARRAY_AGG(DISTINCT pm.user_id) FILTER (WHERE pm.user_id IS NOT NULL) as member_ids
+             GROUP_CONCAT(DISTINCT pm.user_id) as member_ids
       FROM projects p
       LEFT JOIN project_members pm ON pm.project_id = p.id
       WHERE p.deadline < NOW()
@@ -29,7 +29,7 @@ async function checkDeadlines(io) {
     `);
 
     for (const project of overdueProjects) {
-      const memberIds = project.member_ids || [];
+      const memberIds = project.member_ids ? project.member_ids.split(',') : [];
       for (const userId of memberIds) {
         await Notification.create({
           userId,
@@ -51,7 +51,7 @@ async function checkDeadlines(io) {
     // 2. Check projects approaching deadline (within 24 hours)
     const { rows: approachingProjects } = await pool.query(`
       SELECT p.id, p.name, p.deadline,
-             ARRAY_AGG(DISTINCT pm.user_id) FILTER (WHERE pm.user_id IS NOT NULL) as member_ids
+             GROUP_CONCAT(DISTINCT pm.user_id) as member_ids
       FROM projects p
       LEFT JOIN project_members pm ON pm.project_id = p.id
       WHERE p.deadline > NOW()
@@ -69,7 +69,7 @@ async function checkDeadlines(io) {
     `);
 
     for (const project of approachingProjects) {
-      const memberIds = project.member_ids || [];
+      const memberIds = project.member_ids ? project.member_ids.split(',') : [];
       for (const userId of memberIds) {
         await Notification.create({
           userId,

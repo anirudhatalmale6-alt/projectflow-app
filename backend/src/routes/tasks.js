@@ -283,7 +283,11 @@ router.put('/tasks/:id', async (req, res, next) => {
       }
     }
 
-    const updated = await Task.update(req.params.id, updates);
+    let updated = await Task.update(req.params.id, updates);
+    // If no fields were updated (e.g. only assigneeIds sent), use the original task
+    if (!updated) {
+      updated = task;
+    }
 
     // Check if actual_hours now exceeds estimated_hours and notify assignees
     if (updated && updated.estimated_hours && parseFloat(updated.actual_hours) > parseFloat(updated.estimated_hours)) {
@@ -357,13 +361,20 @@ router.put('/tasks/:id', async (req, res, next) => {
       }
     }
 
-    // Enrich with assignees
-    let enrichedTask = updated;
+    // Re-fetch the task to get fresh data after assignee sync
+    let enrichedTask;
     try {
-      const enrichedArr = await Task.enrichWithAssignees([updated]);
-      enrichedTask = enrichedArr[0] || updated;
+      const freshTask = await Task.findById(req.params.id);
+      if (freshTask) {
+        await Task.enrichWithAssignees([freshTask]);
+        enrichedTask = freshTask;
+      } else {
+        enrichedTask = updated;
+        enrichedTask.assignees = [];
+      }
     } catch (enrichErr) {
       console.error('Failed to enrich task with assignees on update:', enrichErr.message);
+      enrichedTask = updated;
       enrichedTask.assignees = [];
     }
 

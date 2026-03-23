@@ -20,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  final GlobalKey<DashboardScreenState> _dashboardKey = GlobalKey<DashboardScreenState>();
 
   @override
   void initState() {
@@ -38,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.space_dashboard_outlined,
           activeIcon: Icons.space_dashboard,
           label: 'Início',
-          screen: const DashboardScreen(),
+          screen: DashboardScreen(key: _dashboardKey),
         ),
         _NavItem(
           icon: Icons.folder_outlined,
@@ -71,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.space_dashboard_outlined,
           activeIcon: Icons.space_dashboard,
           label: 'Início',
-          screen: const DashboardScreen(),
+          screen: DashboardScreen(key: _dashboardKey),
         ),
         _NavItem(
           icon: Icons.folder_outlined,
@@ -105,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.space_dashboard_outlined,
           activeIcon: Icons.space_dashboard,
           label: 'Início',
-          screen: const DashboardScreen(),
+          screen: DashboardScreen(key: _dashboardKey),
         ),
         _NavItem(
           icon: Icons.folder_outlined,
@@ -243,7 +244,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 380;
     return InkWell(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        setState(() => _currentIndex = index);
+        // Refresh dashboard data when switching back to it
+        if (index == 0) {
+          _dashboardKey.currentState?.refreshData();
+        }
+      },
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

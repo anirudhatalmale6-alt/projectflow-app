@@ -11,19 +11,20 @@ class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
+      refreshData();
     });
   }
 
-  Future<void> _loadData() async {
+  /// Public method so HomeScreen can trigger a refresh when tab becomes visible.
+  Future<void> refreshData() async {
     final auth = context.read<AuthProvider>();
     context.read<ProjectProvider>().loadProjects();
     context.read<TaskProvider>().loadTasks(
@@ -46,7 +47,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: refreshData,
         child: CustomScrollView(
           slivers: [
             // Header

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../models/task.dart';
+import '../../models/user.dart';
 import '../../providers/task_provider.dart';
-import '../../providers/project_provider.dart';
+import '../../services/api_service.dart';
 import '../../widgets/loading_widget.dart';
 
 class CreateTaskScreen extends StatefulWidget {
@@ -29,6 +31,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   bool _isEditing = false;
   String? _editId;
   bool _saving = false;
+  List<User> _allUsers = [];
+  bool _loadingUsers = false;
 
   @override
   void didChangeDependencies() {
@@ -53,9 +57,31 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       _projectId = arg;
     }
 
-    // Load project members for assignment
-    if (_projectId != null) {
-      context.read<ProjectProvider>().loadProject(_projectId!);
+    // Load all system users for assignment
+    if (_allUsers.isEmpty && !_loadingUsers) {
+      _loadAllUsers();
+    }
+  }
+
+  Future<void> _loadAllUsers() async {
+    setState(() => _loadingUsers = true);
+    try {
+      final api = ApiService();
+      final response = await api.get(ApiConfig.adminUsers);
+      if (response != null) {
+        final List<dynamic> usersData =
+            response is List ? response : (response['users'] ?? response['data'] ?? []);
+        setState(() {
+          _allUsers = usersData
+              .map((u) => User.fromJson(u as Map<String, dynamic>))
+              .where((u) => u.isApproved)
+              .toList();
+        });
+      }
+    } catch (_) {
+      // Silently fail - users can still create tasks without assignees
+    } finally {
+      if (mounted) setState(() => _loadingUsers = false);
     }
   }
 
@@ -158,9 +184,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final projectProvider = context.watch<ProjectProvider>();
     final taskProvider = context.watch<TaskProvider>();
-    final members = projectProvider.currentMembers;
+    final members = _allUsers;
 
     return Scaffold(
       appBar: AppBar(

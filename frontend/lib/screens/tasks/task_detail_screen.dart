@@ -8,6 +8,7 @@ import '../../config/api_config.dart';
 import '../../models/comment.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/delivery_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/comment_service.dart';
 import '../../widgets/status_badge.dart';
@@ -259,6 +260,173 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         );
       }
     }
+  }
+
+  void _showDeliveryReviewDialog(String deliveryId, String action) {
+    final reviewController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          action == 'approve'
+              ? 'Aprovar Entrega'
+              : action == 'reject'
+                  ? 'Rejeitar Entrega'
+                  : 'Solicitar Revisao',
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: reviewController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Comentarios (opcional)',
+                hintText: 'Adicione um comentario...',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              reviewController.dispose();
+            },
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final comments = reviewController.text.trim().isNotEmpty
+                  ? reviewController.text.trim()
+                  : null;
+              reviewController.dispose();
+
+              final deliveryProvider = context.read<DeliveryProvider>();
+              bool success = false;
+              switch (action) {
+                case 'approve':
+                  success = await deliveryProvider.approveDelivery(deliveryId,
+                      comments: comments);
+                  break;
+                case 'reject':
+                  success = await deliveryProvider.rejectDelivery(deliveryId,
+                      comments: comments);
+                  break;
+                case 'revision':
+                  success = await deliveryProvider.requestRevision(deliveryId,
+                      comments: comments);
+                  break;
+              }
+
+              if (mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(action == 'approve'
+                          ? 'Entrega aprovada'
+                          : action == 'reject'
+                              ? 'Entrega rejeitada'
+                              : 'Revisao solicitada'),
+                      backgroundColor: action == 'approve'
+                          ? AppTheme.successColor
+                          : action == 'reject'
+                              ? AppTheme.errorColor
+                              : AppTheme.warningColor,
+                    ),
+                  );
+                  _loadDeliveries();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro: ${deliveryProvider.errorMessage ?? "Falha na operacao"}'),
+                      backgroundColor: AppTheme.errorColor,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: action == 'approve'
+                  ? AppTheme.successColor
+                  : action == 'reject'
+                      ? AppTheme.errorColor
+                      : AppTheme.warningColor,
+            ),
+            child: Text(
+              action == 'approve'
+                  ? 'Aprovar'
+                  : action == 'reject'
+                      ? 'Rejeitar'
+                      : 'Solicitar Revisao',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApprovalStatusBadge(String status, bool needsApproval) {
+    if (!needsApproval) return const SizedBox.shrink();
+
+    String label;
+    Color color;
+    IconData icon;
+
+    switch (status) {
+      case 'approved':
+        label = 'Aprovado';
+        color = Colors.green;
+        icon = Icons.check_circle;
+        break;
+      case 'rejected':
+        label = 'Rejeitado';
+        color = Colors.red;
+        icon = Icons.cancel;
+        break;
+      case 'revision_requested':
+        label = 'Revisao Solicitada';
+        color = Colors.orange;
+        icon = Icons.refresh;
+        break;
+      case 'in_review':
+        label = 'Aguardando Aprovacao';
+        color = Colors.amber.shade700;
+        icon = Icons.hourglass_top;
+        break;
+      case 'uploaded':
+        label = 'Aguardando Aprovacao';
+        color = Colors.amber.shade700;
+        icon = Icons.hourglass_top;
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatFileSize(dynamic size) {
@@ -775,19 +943,27 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                 final version = d['version'] ?? 1;
                                 final needsApproval = d['requires_approval'] == true;
 
+                                final canReview = needsApproval &&
+                                    (status == 'uploaded' || status == 'in_review') &&
+                                    context.read<AuthProvider>().canApproveDeliveries;
+                                final deliveryId = d['id']?.toString() ?? '';
+
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(10),
-                                    onTap: () => Navigator.pushNamed(
-                                      context,
-                                      '/deliveries/detail',
-                                      arguments: d['id']?.toString(),
-                                    ),
-                                    child: ListTile(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      InkWell(
+                                        borderRadius: BorderRadius.circular(10),
+                                        onTap: () => Navigator.pushNamed(
+                                          context,
+                                          '/deliveries/detail',
+                                          arguments: deliveryId,
+                                        ),
+                                        child: ListTile(
                                     leading: Container(
                                       width: 42,
                                       height: 42,
@@ -858,29 +1034,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                                       AppTheme.textTertiary,
                                                 ),
                                               ),
-                                            if (needsApproval)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: const Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.approval, size: 10, color: Colors.orange),
-                                                    SizedBox(width: 2),
-                                                    Text(
-                                                      'Aprovação',
-                                                      style: TextStyle(
-                                                        fontSize: 9,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: Colors.orange,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
+                                            _buildApprovalStatusBadge(status, needsApproval),
                                           ],
                                         ),
                                         const SizedBox(height: 2),
@@ -914,7 +1068,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                         if (_canDeleteDelivery(d, context.read<AuthProvider>()))
                                           InkWell(
                                             onTap: () => _deleteDelivery(
-                                              d['id']?.toString() ?? '',
+                                              deliveryId,
                                               title,
                                             ),
                                             child: Padding(
@@ -927,6 +1081,88 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                       ],
                                     ),
                                   ),
+                                      ),
+                                      // Inline approve/reject/revision buttons
+                                      if (canReview)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 12, right: 12, bottom: 8),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: SizedBox(
+                                                  height: 30,
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: () => _showDeliveryReviewDialog(
+                                                        deliveryId, 'approve'),
+                                                    icon: const Icon(Icons.check_circle, size: 14),
+                                                    label: const Text('Aprovar',
+                                                        style: TextStyle(fontSize: 11)),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.green,
+                                                      foregroundColor: Colors.white,
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 6),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(6),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: SizedBox(
+                                                  height: 30,
+                                                  child: OutlinedButton.icon(
+                                                    onPressed: () => _showDeliveryReviewDialog(
+                                                        deliveryId, 'revision'),
+                                                    icon: const Icon(Icons.refresh, size: 14),
+                                                    label: const Text('Revisao',
+                                                        style: TextStyle(fontSize: 11)),
+                                                    style: OutlinedButton.styleFrom(
+                                                      foregroundColor: Colors.orange,
+                                                      side: const BorderSide(
+                                                          color: Colors.orange),
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 6),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(6),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: SizedBox(
+                                                  height: 30,
+                                                  child: OutlinedButton.icon(
+                                                    onPressed: () => _showDeliveryReviewDialog(
+                                                        deliveryId, 'reject'),
+                                                    icon: const Icon(Icons.cancel, size: 14),
+                                                    label: const Text('Rejeitar',
+                                                        style: TextStyle(fontSize: 11)),
+                                                    style: OutlinedButton.styleFrom(
+                                                      foregroundColor: Colors.red,
+                                                      side: const BorderSide(
+                                                          color: Colors.red),
+                                                      padding: const EdgeInsets.symmetric(
+                                                          horizontal: 6),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(6),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 );
                               }).toList(),

@@ -351,121 +351,85 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Status box
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(delivery.status).withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _getStatusColor(delivery.status).withOpacity(0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _getStatusIcon(delivery.status),
-                          color: _getStatusColor(delivery.status),
-                          size: 28,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Status da Entrega',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.textTertiary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _getStatusLabel(delivery.status),
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: _getStatusColor(delivery.status),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                  // Status selector - dropdown style
+                  const Text(
+                    'Status da Entrega',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // Approval buttons - always visible for admin/manager
-                  if (auth.canApproveDeliveries && delivery.status != 'approved') ...[
-                    const Text(
-                      'Acoes de Revisao',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
+                  const SizedBox(height: 8),
+                  if (auth.canApproveDeliveries) ...[
+                    // Clickable status options for admin/manager
+                    _buildStatusOption(
+                      'approved',
+                      'Aprovado',
+                      Icons.check_circle,
+                      AppTheme.successColor,
+                      delivery.status == 'approved',
+                      () => _showReviewDialog('approve'),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildStatusOption(
+                      'revision_requested',
+                      'Sendo Alterado',
+                      Icons.replay_circle_filled,
+                      AppTheme.warningColor,
+                      delivery.status == 'revision_requested',
+                      () => _showReviewDialog('revision'),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildStatusOption(
+                      'in_review',
+                      'Aguardando Aprovacao',
+                      Icons.hourglass_top,
+                      Colors.amber.shade700,
+                      delivery.status == 'in_review' || delivery.status == 'uploaded',
+                      null, // current status, no action
+                    ),
+                    const SizedBox(height: 8),
+                    _buildStatusOption(
+                      'rejected',
+                      'Rejeitado',
+                      Icons.cancel,
+                      AppTheme.errorColor,
+                      delivery.status == 'rejected',
+                      () => _showReviewDialog('reject'),
+                    ),
+                  ] else ...[
+                    // Read-only status display for non-admins
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(delivery.status).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _getStatusColor(delivery.status).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getStatusIcon(delivery.status),
+                            color: _getStatusColor(delivery.status),
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _getStatusLabel(delivery.status),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: _getStatusColor(delivery.status),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _showReviewDialog('approve'),
-                            icon: const Icon(Icons.check_circle_outline),
-                            label: const Text('Aprovar'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.successColor,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showReviewDialog('revision'),
-                            icon: const Icon(Icons.replay),
-                            label: const Text('Revisao'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.warningColor,
-                              side: const BorderSide(
-                                  color: AppTheme.warningColor),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showReviewDialog('reject'),
-                            icon: const Icon(Icons.cancel_outlined),
-                            label: const Text('Rejeitar'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.errorColor,
-                              side: const BorderSide(
-                                  color: AppTheme.errorColor),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
                   ],
-                  if (delivery.status == 'approved')
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: Text(
-                        'Entrega aprovada',
-                        style: TextStyle(
-                          color: AppTheme.successColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+                  const SizedBox(height: 20),
                   // Comments
                   Row(
                     children: [
@@ -587,6 +551,51 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStatusOption(
+    String value,
+    String label,
+    IconData icon,
+    Color color,
+    bool isSelected,
+    VoidCallback? onTap,
+  ) {
+    return InkWell(
+      onTap: isSelected ? null : onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.12) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade200,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isSelected ? color : Colors.grey.shade400, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected ? color : AppTheme.textSecondary,
+                ),
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.radio_button_checked, color: color, size: 22)
+            else if (onTap != null)
+              Icon(Icons.radio_button_unchecked, color: Colors.grey.shade300, size: 22),
+          ],
+        ),
+      ),
     );
   }
 

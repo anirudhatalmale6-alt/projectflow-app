@@ -134,4 +134,7 @@ class ApiConfig {
   static String adminRejectUser(String id) => '$apiPrefix/admin/users/$id/reject';
   static const String adminStats = '$apiPrefix/admin/stats';
   static const String adminAuditLog = '$apiPrefix/admin/audit-log';
+
+  // Users (public - any authenticated user)
+  static const String allUsers = '$apiPrefix/users';
 }

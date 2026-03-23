@@ -310,6 +310,31 @@ const Task = {
     return rows;
   },
 
+  async findAll({ status, priority } = {}) {
+    let query = `
+      SELECT t.*, p.name AS project_name, p.status AS project_status
+      FROM tasks t
+      JOIN projects p ON t.project_id = p.id
+      WHERE t.deleted_at IS NULL
+    `;
+    const values = [];
+    let paramIdx = 1;
+
+    if (status) {
+      query += ` AND t.status = $${paramIdx++}`;
+      values.push(status);
+    }
+    if (priority) {
+      query += ` AND t.priority = $${paramIdx++}`;
+      values.push(priority);
+    }
+
+    query += ' ORDER BY CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END, t.due_date ASC, t.priority DESC, t.created_at DESC';
+
+    const { rows } = await pool.query(query, values);
+    return rows;
+  },
+
   async countAll() {
     const { rows } = await pool.query('SELECT COUNT(*)::int AS count FROM tasks WHERE deleted_at IS NULL');
     return rows[0].count;

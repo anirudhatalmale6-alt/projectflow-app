@@ -486,7 +486,15 @@ router.delete('/tasks/:id', async (req, res, next) => {
 router.get('/tasks', async (req, res, next) => {
   try {
     const { status, priority, search } = req.query;
-    const tasks = await Task.findByAssignee(req.user.id, { status, priority });
+    // Admin/manager see all tasks; others see only their assigned tasks
+    const isAdminOrManager = req.user.role === 'admin' || req.user.role === 'manager';
+    const tasks = isAdminOrManager
+      ? await Task.findAll({ status, priority })
+      : await Task.findByAssignee(req.user.id, { status, priority });
+
+    // Enrich with assignees
+    await enrichWithAssignees(tasks);
+
     res.json({ tasks });
   } catch (err) {
     next(err);
@@ -824,6 +832,18 @@ router.get('/tasks/:id/assignees', async (req, res, next) => {
       [req.params.id]
     );
     res.json({ assignees });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/users - list all approved users (for assignee selection)
+router.get('/users', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, email, avatar_url, role FROM users WHERE is_approved = TRUE ORDER BY name ASC`
+    );
+    res.json({ users: rows });
   } catch (err) {
     next(err);
   }

@@ -67,19 +67,18 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     setState(() => _loadingUsers = true);
     try {
       final api = ApiService();
-      final response = await api.get(ApiConfig.adminUsers);
+      final response = await api.get(ApiConfig.allUsers);
       if (response != null) {
         final List<dynamic> usersData =
             response is List ? response : (response['users'] ?? response['data'] ?? []);
         setState(() {
           _allUsers = usersData
               .map((u) => User.fromJson(u as Map<String, dynamic>))
-              .where((u) => u.isApproved)
               .toList();
         });
       }
-    } catch (_) {
-      // Silently fail - users can still create tasks without assignees
+    } catch (e) {
+      debugPrint('Failed to load users: $e');
     } finally {
       if (mounted) setState(() => _loadingUsers = false);
     }

@@ -943,8 +943,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                 final version = d['version'] ?? 1;
                                 final needsApproval = d['requires_approval'] == true;
 
-                                final canReview = needsApproval &&
-                                    (status == 'uploaded' || status == 'in_review') &&
+                                final canReview = status != 'approved' &&
                                     context.read<AuthProvider>().canApproveDeliveries;
                                 final deliveryId = d['id']?.toString() ?? '';
 

@@ -351,8 +351,53 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Approval buttons
-                  if (auth.canApproveDeliveries && delivery.canBeReviewed) ...[
+                  // Status box
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(delivery.status).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _getStatusColor(delivery.status).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _getStatusIcon(delivery.status),
+                          color: _getStatusColor(delivery.status),
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Status da Entrega',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textTertiary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _getStatusLabel(delivery.status),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: _getStatusColor(delivery.status),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Approval buttons - always visible for admin/manager
+                  if (auth.canApproveDeliveries && delivery.status != 'approved') ...[
                     const Text(
                       'Acoes de Revisao',
                       style: TextStyle(
@@ -410,6 +455,17 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                     ),
                     const SizedBox(height: 20),
                   ],
+                  if (delivery.status == 'approved')
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Text(
+                        'Entrega aprovada',
+                        style: TextStyle(
+                          color: AppTheme.successColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   // Comments
                   Row(
                     children: [
@@ -532,6 +588,51 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         ),
       ],
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'approved':
+        return AppTheme.successColor;
+      case 'rejected':
+        return AppTheme.errorColor;
+      case 'revision_requested':
+        return AppTheme.warningColor;
+      case 'in_review':
+        return Colors.amber.shade700;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'approved':
+        return Icons.check_circle;
+      case 'rejected':
+        return Icons.cancel;
+      case 'revision_requested':
+        return Icons.replay_circle_filled;
+      case 'in_review':
+        return Icons.hourglass_top;
+      default:
+        return Icons.upload_file;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'approved':
+        return 'Aprovado';
+      case 'rejected':
+        return 'Rejeitado';
+      case 'revision_requested':
+        return 'Revisao Solicitada';
+      case 'in_review':
+        return 'Aguardando Aprovacao';
+      default:
+        return 'Enviado';
+    }
   }
 
   IconData _getFormatIcon(String? format, [String? title]) {

@@ -656,7 +656,14 @@ router.patch('/tasks/:id/hours', async (req, res, next) => {
       return res.status(400).json({ error: 'actual_hours is required.' });
     }
 
-    const updated = await Task.update(req.params.id, { actual_hours: parseFloat(actualHours) || 0 });
+    const updates = { actual_hours: parseFloat(actualHours) || 0 };
+
+    // Auto-start timer when hours are first registered and timer isn't already running
+    if (parseFloat(actualHours) > 0 && !task.timer_started_at) {
+      updates.timer_started_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    }
+
+    const updated = await Task.update(req.params.id, updates);
 
     const io = req.app.get('io');
     if (io) {

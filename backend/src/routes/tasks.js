@@ -493,7 +493,7 @@ router.get('/tasks', async (req, res, next) => {
       : await Task.findByAssignee(req.user.id, { status, priority });
 
     // Enrich with assignees
-    await enrichWithAssignees(tasks);
+    await Task.enrichWithAssignees(tasks);
 
     res.json({ tasks });
   } catch (err) {

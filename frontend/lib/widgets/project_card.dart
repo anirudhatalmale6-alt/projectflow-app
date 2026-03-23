@@ -12,13 +12,14 @@ class ProjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 600;
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: EdgeInsets.symmetric(horizontal: isSmall ? 12 : 16, vertical: 6),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isSmall ? 12 : 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

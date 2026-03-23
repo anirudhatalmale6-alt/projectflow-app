@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255),
     avatar_url TEXT,
     role VARCHAR(20) NOT NULL DEFAULT 'editor',
+    is_approved BOOLEAN NOT NULL DEFAULT FALSE,
     phone VARCHAR(30),
     organization_id CHAR(36),
     google_id VARCHAR(255),
@@ -100,10 +101,11 @@ CREATE TABLE IF NOT EXISTS projects (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     client_id CHAR(36),
-    status VARCHAR(20) NOT NULL DEFAULT 'draft',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
     deadline TIMESTAMP NULL,
     budget DECIMAL(12, 2),
     currency VARCHAR(3) DEFAULT 'BRL',
+    color VARCHAR(7),
     created_by CHAR(36) NOT NULL,
     organization_id CHAR(36),
     drive_folder_url TEXT,
@@ -494,3 +496,24 @@ BEGIN
     SET NEW.version = next_ver;
 END//
 DELIMITER ;
+
+-- ============================================================
+-- Add color column to projects (for existing databases)
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'projects' AND column_name = 'color');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE projects ADD COLUMN color VARCHAR(7) AFTER currency', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- Add is_approved column to users (account approval system)
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'is_approved');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE users ADD COLUMN is_approved BOOLEAN NOT NULL DEFAULT FALSE AFTER role', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Set existing users as approved (so they are not locked out)
+UPDATE users SET is_approved = TRUE WHERE is_approved = FALSE;

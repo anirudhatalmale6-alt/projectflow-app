@@ -17,11 +17,13 @@ class ProjectsListScreen extends StatefulWidget {
 class _ProjectsListScreenState extends State<ProjectsListScreen> {
   String? _statusFilter;
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProjectProvider>().loadProjects();
     });
@@ -30,7 +32,15 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      context.read<ProjectProvider>().loadMoreProjects();
+    }
   }
 
   void _applyFilter() {
@@ -99,6 +109,7 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 _buildFilterChip('Todos', null),
+                _buildFilterChip('Ativo', 'active'),
                 _buildFilterChip('Rascunho', 'draft'),
                 _buildFilterChip('Em Progresso', 'in_progress'),
                 _buildFilterChip('Em Revisão', 'review'),
@@ -130,9 +141,19 @@ class _ProjectsListScreenState extends State<ProjectsListScreen> {
                           status: _statusFilter,
                         ),
                         child: ListView.builder(
+                          controller: _scrollController,
                           padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: projectProvider.projects.length,
+                          itemCount: projectProvider.projects.length +
+                              (projectProvider.hasMoreProjects ? 1 : 0),
                           itemBuilder: (context, index) {
+                            if (index >= projectProvider.projects.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              );
+                            }
                             final project = projectProvider.projects[index];
                             return ProjectCard(
                               project: project,

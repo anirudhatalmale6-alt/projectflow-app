@@ -37,13 +37,13 @@ router.get('/', async (req, res, next) => {
 // Only admin and manager can create projects
 router.post('/', requireGlobalRole('admin', 'manager'), async (req, res, next) => {
   try {
-    const { name, description, client_id, status, deadline, budget, currency } = req.body;
+    const { name, description, client_id, status, deadline, budget, currency, color } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return res.status(400).json({ error: 'Project name is required.' });
     }
 
-    const validStatuses = ['draft', 'in_progress', 'review', 'delivered', 'completed', 'archived'];
+    const validStatuses = ['active', 'draft', 'in_progress', 'review', 'delivered', 'completed', 'archived'];
     if (status && !validStatuses.includes(status)) {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` });
     }
@@ -56,10 +56,11 @@ router.post('/', requireGlobalRole('admin', 'manager'), async (req, res, next) =
       name: name.trim(),
       description: description || null,
       clientId: client_id || null,
-      status: status || 'draft',
+      status: status || 'active',
       deadline: deadline || null,
       budget: budget || null,
       currency: currency || 'BRL',
+      color: color || null,
       createdBy: req.user.id,
     });
 
@@ -129,9 +130,9 @@ router.put('/:id', requireProjectManager(), async (req, res, next) => {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
-    const { name, description, client_id, status, deadline, budget, currency } = req.body;
+    const { name, description, client_id, status, deadline, budget, currency, color } = req.body;
 
-    const validStatuses = ['draft', 'in_progress', 'review', 'delivered', 'completed', 'archived'];
+    const validStatuses = ['active', 'draft', 'in_progress', 'review', 'delivered', 'completed', 'archived'];
     if (status && !validStatuses.includes(status)) {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}.` });
     }
@@ -148,6 +149,7 @@ router.put('/:id', requireProjectManager(), async (req, res, next) => {
     if (deadline !== undefined) updates.deadline = deadline || null;
     if (budget !== undefined) updates.budget = budget;
     if (currency !== undefined) updates.currency = currency;
+    if (color !== undefined) updates.color = color || null;
 
     const updated = await Project.update(req.params.id, updates);
 

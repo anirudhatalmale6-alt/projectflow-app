@@ -14,10 +14,83 @@ const router = express.Router();
 // All admin routes require auth + admin role
 router.use(auth, requireGlobalRole('admin'));
 
+// GET /api/v1/admin/users/pending - list pending approval users
+router.get('/users/pending', async (req, res, next) => {
+  try {
+    const users = await User.findPending();
+    res.json({ users, total: users.length });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/v1/admin/users/:id/approve - approve a pending user
+router.put('/users/:id/approve', async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    if (user.is_approved) {
+      return res.status(400).json({ error: 'Usuário já está aprovado.' });
+    }
+
+    const updated = await User.updateApproval(req.params.id, true);
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'approve_user',
+      entityType: 'user',
+      entityId: req.params.id,
+      details: { user_name: user.name, user_email: user.email },
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({
+      message: `Usuário ${user.name} aprovado com sucesso.`,
+      user: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/v1/admin/users/:id/reject - reject (delete) a pending user
+router.put('/users/:id/reject', async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    }
+
+    if (user.is_approved) {
+      return res.status(400).json({ error: 'Não é possível rejeitar um usuário já aprovado.' });
+    }
+
+    // Delete the rejected user
+    await pool.query('DELETE FROM refresh_tokens WHERE user_id = $1', [req.params.id]);
+    await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'reject_user',
+      entityType: 'user',
+      entityId: req.params.id,
+      details: { user_name: user.name, user_email: user.email },
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({ message: `Usuário ${user.name} rejeitado e removido.` });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/v1/admin/users - list all users with stats
 router.get('/users', async (req, res, next) => {
   try {
-    const { limit = 50, offset = 0, search, role } = req.query;
+    const { limit = 50, offset = 0, search, role, is_approved } = req.query;
 
     let users;
     if (search) {
@@ -27,6 +100,7 @@ router.get('/users', async (req, res, next) => {
         limit: Math.min(parseInt(limit, 10) || 50, 200),
         offset: parseInt(offset, 10) || 0,
         role: role || undefined,
+        is_approved: is_approved !== undefined ? is_approved === 'true' : undefined,
       });
     }
 
@@ -276,6 +350,7 @@ router.post('/users', async (req, res, next) => {
       password,
       role: userRole,
       phone: phone || null,
+      is_approved: true,
     });
 
     await logAudit({

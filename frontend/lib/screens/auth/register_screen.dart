@@ -28,6 +28,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  bool _showPendingMessage = false;
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -40,7 +42,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/home');
+      if (auth.pendingApproval) {
+        setState(() => _showPendingMessage = true);
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     }
   }
 
@@ -74,6 +80,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+              if (_showPendingMessage)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.orange.shade300,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.hourglass_top, color: Colors.orange, size: 40),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Cadastro Realizado!',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Sua conta foi criada com sucesso, mas precisa ser aprovada por um administrador antes de poder acessar o sistema. Você será notificado quando sua conta for aprovada.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Voltar ao Login'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (!_showPendingMessage)
               Consumer<AuthProvider>(
                 builder: (context, auth, _) {
                   if (auth.errorMessage != null) {
@@ -113,6 +163,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   return const SizedBox.shrink();
                 },
               ),
+              if (!_showPendingMessage)
               Form(
                 key: _formKey,
                 child: Column(
@@ -238,7 +289,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ),
+              if (!_showPendingMessage)
               const SizedBox(height: 24),
+              if (!_showPendingMessage)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

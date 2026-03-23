@@ -97,6 +97,9 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  bool _pendingApproval = false;
+  bool get pendingApproval => _pendingApproval;
+
   Future<bool> register({
     required String name,
     required String email,
@@ -105,6 +108,7 @@ class AuthProvider with ChangeNotifier {
   }) async {
     _state = AuthState.loading;
     _errorMessage = null;
+    _pendingApproval = false;
     notifyListeners();
 
     try {
@@ -114,6 +118,15 @@ class AuthProvider with ChangeNotifier {
         password: password,
         passwordConfirmation: passwordConfirmation,
       );
+
+      // Check if registration requires approval
+      if (data['pending_approval'] == true) {
+        _pendingApproval = true;
+        _state = AuthState.unauthenticated;
+        notifyListeners();
+        return true; // Registration succeeded, but needs approval
+      }
+
       _user = User.fromJson(data['user'] ?? {});
       if (_user!.id.isEmpty) {
         _user = await _authService.me();

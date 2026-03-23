@@ -25,7 +25,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
   String? _clientId;
   String? _clientName;
   Color _color = AppTheme.primaryColor;
-  String _status = 'draft';
+  String _status = 'active';
   bool _isEditing = false;
   String? _editId;
 
@@ -228,6 +228,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
                       prefixIcon: Icon(Icons.flag_outlined),
                     ),
                     items: const [
+                      DropdownMenuItem(value: 'active', child: Text('Ativo')),
                       DropdownMenuItem(value: 'draft', child: Text('Rascunho')),
                       DropdownMenuItem(
                           value: 'in_progress', child: Text('Em Progresso')),
@@ -241,7 +242,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
                           value: 'archived', child: Text('Arquivado')),
                     ],
                     onChanged: (value) =>
-                        setState(() => _status = value ?? 'draft'),
+                        setState(() => _status = value ?? 'active'),
                   ),
                 if (_isEditing) const SizedBox(height: 16),
                 // Deadline

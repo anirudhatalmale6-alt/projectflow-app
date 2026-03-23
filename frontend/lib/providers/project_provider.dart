@@ -15,7 +15,13 @@ class ProjectProvider with ChangeNotifier {
   Project? _currentProject;
   List<User> _currentMembers = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   bool _loadingProject = false;
+  bool _hasMoreProjects = true;
+  int _currentPage = 1;
+  static const int _pageSize = 20;
+  String? _currentStatus;
+  String? _currentSearch;
   String? _errorMessage;
 
   List<Project> get projects => _projects;
@@ -23,23 +29,62 @@ class ProjectProvider with ChangeNotifier {
   Project? get currentProject => _currentProject;
   List<User> get currentMembers => _currentMembers;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   bool get loadingProject => _loadingProject;
+  bool get hasMoreProjects => _hasMoreProjects;
   String? get errorMessage => _errorMessage;
 
   Future<void> loadProjects({String? status, String? search}) async {
     _isLoading = true;
     _errorMessage = null;
+    _currentPage = 1;
+    _hasMoreProjects = true;
+    _currentStatus = status;
+    _currentSearch = search;
     notifyListeners();
 
     try {
       _projects = await _projectService.getProjects(
         status: status,
         search: search,
+        page: 1,
+        limit: _pageSize,
       );
+      _hasMoreProjects = _projects.length >= _pageSize;
     } catch (e) {
       _errorMessage = _parseError(e);
     }
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadMoreProjects() async {
+    if (_isLoadingMore || !_hasMoreProjects) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final nextPage = _currentPage + 1;
+      final moreProjects = await _projectService.getProjects(
+        status: _currentStatus,
+        search: _currentSearch,
+        page: nextPage,
+        limit: _pageSize,
+      );
+
+      if (moreProjects.isEmpty) {
+        _hasMoreProjects = false;
+      } else {
+        _currentPage = nextPage;
+        _projects.addAll(moreProjects);
+        _hasMoreProjects = moreProjects.length >= _pageSize;
+      }
+    } catch (e) {
+      _errorMessage = _parseError(e);
+    }
+
+    _isLoadingMore = false;
     notifyListeners();
   }
 

@@ -19,6 +19,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   List<User> _users = [];
   bool _isLoading = true;
   String? _roleFilter;
+  bool _showPendingOnly = false;
 
   @override
   void initState() {
@@ -29,15 +30,92 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
     try {
-      final params = <String, String>{};
-      if (_roleFilter != null) params['role'] = _roleFilter!;
-      final data = await _api.get(ApiConfig.adminUsers, queryParams: params);
-      final list = data['users'] ?? data['data'] ?? data;
-      _users = (list as List).map((json) => User.fromJson(json)).toList();
+      if (_showPendingOnly) {
+        final data = await _api.get(ApiConfig.adminPendingUsers);
+        final list = data['users'] ?? data['data'] ?? data;
+        _users = (list as List).map((json) => User.fromJson(json)).toList();
+      } else {
+        final params = <String, String>{};
+        if (_roleFilter != null) params['role'] = _roleFilter!;
+        final data = await _api.get(ApiConfig.adminUsers, queryParams: params);
+        final list = data['users'] ?? data['data'] ?? data;
+        _users = (list as List).map((json) => User.fromJson(json)).toList();
+      }
     } catch (_) {
       _users = [];
     }
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _approveUser(User user) async {
+    try {
+      await _api.put(ApiConfig.adminApproveUser(user.id));
+      _loadUsers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${user.name} aprovado com sucesso'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao aprovar usuário'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectUser(User user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rejeitar Usuário'),
+        content: Text(
+          'Tem certeza que deseja rejeitar "${user.name}"? O cadastro será removido.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            child: const Text('Rejeitar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _api.put(ApiConfig.adminRejectUser(user.id));
+      _loadUsers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${user.name} rejeitado e removido'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao rejeitar usuário'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
   }
 
   void _showRoleDialog(User user) {
@@ -195,6 +273,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 _buildFilterChip('Todos', null),
+                _buildPendingFilterChip(),
                 _buildFilterChip('Admin', 'admin'),
                 _buildFilterChip('Gerente', 'manager'),
                 _buildFilterChip('Editor', 'editor'),
@@ -247,11 +326,46 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                     const SizedBox(height: 4),
-                                    RoleBadge(role: user.role),
+                                    Row(
+                                      children: [
+                                        RoleBadge(role: user.role),
+                                        if (!user.isApproved) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.shade100,
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.orange.shade300),
+                                            ),
+                                            child: const Text(
+                                              'Pendente',
+                                              style: TextStyle(fontSize: 11, color: Colors.deepOrange, fontWeight: FontWeight.w600),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ],
                                 ),
                                 isThreeLine: true,
-                                trailing: PopupMenuButton<String>(
+                                trailing: !user.isApproved
+                                    ? Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.check_circle, color: Colors.green, size: 28),
+                                            tooltip: 'Aprovar',
+                                            onPressed: () => _approveUser(user),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.cancel, color: Colors.red, size: 28),
+                                            tooltip: 'Rejeitar',
+                                            onPressed: () => _rejectUser(user),
+                                          ),
+                                        ],
+                                      )
+                                    : PopupMenuButton<String>(
                                   onSelected: (value) {
                                     if (value == 'role') {
                                       _showRoleDialog(user);
@@ -424,15 +538,38 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     );
   }
 
+  Widget _buildPendingFilterChip() {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: const Text('Pendentes'),
+        selected: _showPendingOnly,
+        onSelected: (selected) {
+          setState(() {
+            _showPendingOnly = selected;
+            if (selected) _roleFilter = null;
+          });
+          _loadUsers();
+        },
+        selectedColor: Colors.orange.withOpacity(0.2),
+        checkmarkColor: Colors.deepOrange,
+        avatar: _showPendingOnly ? null : const Icon(Icons.hourglass_top, size: 16, color: Colors.orange),
+      ),
+    );
+  }
+
   Widget _buildFilterChip(String label, String? role) {
-    final isSelected = _roleFilter == role;
+    final isSelected = !_showPendingOnly && _roleFilter == role;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
         label: Text(label),
         selected: isSelected,
         onSelected: (selected) {
-          setState(() => _roleFilter = selected ? role : null);
+          setState(() {
+            _showPendingOnly = false;
+            _roleFilter = selected ? role : null;
+          });
           _loadUsers();
         },
         selectedColor: AppTheme.primaryColor.withOpacity(0.15),

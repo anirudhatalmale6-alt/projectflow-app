@@ -175,13 +175,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNavItem(
       _NavItem item, bool isSelected, int index, NotificationProvider notifs) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 380;
     return InkWell(
       onTap: () => setState(() => _currentIndex = index),
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 16 : 12,
+          horizontal: isSelected ? (isCompact ? 10 : 16) : (isCompact ? 8 : 12),
           vertical: 8,
         ),
         decoration: BoxDecoration(
@@ -190,24 +192,26 @@ class _HomeScreenState extends State<HomeScreen> {
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               isSelected ? item.activeIcon : item.icon,
-              size: 22,
+              size: isCompact ? 20 : 22,
               color: isSelected ? AppTheme.textPrimary : AppTheme.textTertiary,
             ),
             if (isSelected) ...[
-              const SizedBox(width: 6),
+              const SizedBox(height: 2),
               Text(
                 item.label,
-                style: const TextStyle(
-                  fontSize: 12,
+                style: TextStyle(
+                  fontSize: isCompact ? 10 : 11,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimary,
                   fontFamily: 'Poppins',
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ],
           ],

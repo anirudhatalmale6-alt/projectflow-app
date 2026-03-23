@@ -32,6 +32,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _loadingDeliveries = false;
   bool _sendingComment = false;
   bool _uploading = false;
+  double _uploadProgress = 0.0;
   String? _taskId;
 
   @override
@@ -108,7 +109,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
     if (requiresApproval == null) return; // dismissed
 
-    setState(() => _uploading = true);
+    setState(() {
+      _uploading = true;
+      _uploadProgress = 0.0;
+    });
 
     try {
       await _api.multipartPostBytes(
@@ -120,6 +124,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         fileBytes: file.bytes!,
         fileName: file.name,
         fileField: 'file',
+        onProgress: (bytesSent, totalBytes) {
+          if (mounted && totalBytes > 0) {
+            setState(() {
+              _uploadProgress = bytesSent / totalBytes;
+            });
+          }
+        },
       );
       await _loadDeliveries();
       if (mounted) {
@@ -418,15 +429,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 14 : 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Title and status
                   Text(
                     task.title,
-                    style: const TextStyle(
-                      fontSize: 22,
+                    style: TextStyle(
+                      fontSize: MediaQuery.of(context).size.width < 600 ? 18 : 22,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary,
                     ),
@@ -677,7 +688,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         children: [
                           Icon(
                             _uploading
-                                ? Icons.hourglass_top
+                                ? Icons.cloud_upload
                                 : Icons.cloud_upload_outlined,
                             size: 36,
                             color: AppTheme.primaryColor.withOpacity(0.6),
@@ -685,7 +696,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           const SizedBox(height: 8),
                           Text(
                             _uploading
-                                ? 'Enviando arquivo...'
+                                ? 'Enviando arquivo... ${(_uploadProgress * 100).toStringAsFixed(0)}%'
                                 : 'Toque para enviar arquivo',
                             style: TextStyle(
                               fontSize: 14,
@@ -693,14 +704,37 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Videos, imagens, PDFs, arquivos de projeto...',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textTertiary,
+                          if (_uploading) ...[
+                            const SizedBox(height: 12),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: _uploadProgress,
+                                minHeight: 6,
+                                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppTheme.primaryColor,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${(_uploadProgress * 100).toStringAsFixed(0)}% concluido',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textTertiary,
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Videos, imagens, PDFs, arquivos de projeto...',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textTertiary,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -782,7 +816,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 2),
-                                        Row(
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
                                           children: [
                                             Container(
                                               padding:
@@ -805,7 +841,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 6),
                                             Text(
                                               'v$version',
                                               style: const TextStyle(
@@ -813,8 +848,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                                 color: AppTheme.textTertiary,
                                               ),
                                             ),
-                                            if (fileSize != null) ...[
-                                              const SizedBox(width: 6),
+                                            if (fileSize != null)
                                               Text(
                                                 _formatFileSize(fileSize),
                                                 style: const TextStyle(
@@ -823,9 +857,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                                       AppTheme.textTertiary,
                                                 ),
                                               ),
-                                            ],
-                                            if (needsApproval) ...[
-                                              const SizedBox(width: 6),
+                                            if (needsApproval)
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                                 decoration: BoxDecoration(
@@ -848,7 +880,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                                   ],
                                                 ),
                                               ),
-                                            ],
                                           ],
                                         ),
                                         const SizedBox(height: 2),

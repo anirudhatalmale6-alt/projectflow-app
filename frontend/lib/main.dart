@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'config/api_config.dart';
 import 'config/theme.dart';
+import 'services/api_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/project_provider.dart';
 import 'providers/task_provider.dart';
@@ -51,8 +53,62 @@ void main() async {
   runApp(const DuozzFlowApp());
 }
 
-class DuozzFlowApp extends StatelessWidget {
+class DuozzFlowApp extends StatefulWidget {
   const DuozzFlowApp({super.key});
+
+  @override
+  State<DuozzFlowApp> createState() => _DuozzFlowAppState();
+}
+
+class _DuozzFlowAppState extends State<DuozzFlowApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // For web: listen for visibility changes (tab switching)
+    if (kIsWeb) {
+      _setupWebVisibilityListener();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App came back to foreground - refresh token proactively
+      _refreshTokenOnResume();
+    }
+  }
+
+  void _setupWebVisibilityListener() {
+    // On web, WidgetsBindingObserver does not reliably detect tab switches.
+    // We use the HTML visibilitychange event via dart:ui's ChannelBuffers
+    // or we rely on the fact that Flutter web 3.13+ maps visibilitychange
+    // to AppLifecycleState. For older versions, the _ensureValidToken in
+    // ApiService handles it on the next API call.
+  }
+
+  Future<void> _refreshTokenOnResume() async {
+    try {
+      final apiService = ApiService();
+      await apiService.loadTokens();
+      if (apiService.hasTokens) {
+        // The _ensureValidToken check in ApiService will handle
+        // proactive refresh on the next API call. We can also
+        // trigger it here explicitly.
+        await apiService.loadTokens(); // Re-parse expiry
+      }
+    } catch (_) {
+      // Silently ignore - next API call will handle it
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -212,6 +212,8 @@ class AppTheme {
   // Status color helper
   static Color getProjectStatusColor(String status) {
     switch (status) {
+      case 'active':
+        return statusInProgress;
       case 'draft':
         return statusDraft;
       case 'in_progress':
@@ -231,6 +233,8 @@ class AppTheme {
 
   static String getProjectStatusLabel(String status) {
     switch (status) {
+      case 'active':
+        return 'Ativo';
       case 'draft':
         return 'Rascunho';
       case 'in_progress':

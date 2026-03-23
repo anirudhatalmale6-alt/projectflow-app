@@ -51,7 +51,7 @@ class Project {
     this.description,
     this.clientId,
     this.clientName,
-    this.status = 'draft',
+    this.status = 'active',
     this.deadline,
     this.budget,
     this.currency = 'BRL',
@@ -70,7 +70,7 @@ class Project {
       description: json['description'],
       clientId: json['client_id']?.toString(),
       clientName: json['client_name'],
-      status: json['status'] ?? 'draft',
+      status: json['status'] ?? 'active',
       deadline:
           json['deadline'] != null ? DateTime.tryParse(json['deadline']) : null,
       budget: json['budget'] != null

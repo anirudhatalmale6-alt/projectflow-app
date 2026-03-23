@@ -31,14 +31,20 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           'UPDATE users SET google_id = $1, google_access_token = $2, google_refresh_token = COALESCE($3, google_refresh_token), avatar_url = COALESCE(avatar_url, $4) WHERE id = $5',
           [profile.id, accessToken, refreshToken, profile.photos?.[0]?.value, user.id]
         );
+
+        // Check if approved
+        if (!user.is_approved) {
+          return done(new Error('PENDING_APPROVAL'), null);
+        }
       } else {
-        // Create new user from Google
+        // Create new user from Google (pending approval)
         const result = await pool.query(
-          `INSERT INTO users (name, email, google_id, google_access_token, google_refresh_token, avatar_url, role)
-           VALUES ($1, $2, $3, $4, $5, $6, 'editor') RETURNING *`,
+          `INSERT INTO users (name, email, google_id, google_access_token, google_refresh_token, avatar_url, role, is_approved)
+           VALUES ($1, $2, $3, $4, $5, $6, 'editor', FALSE) RETURNING *`,
           [profile.displayName, email, profile.id, accessToken, refreshToken, profile.photos?.[0]?.value]
         );
         user = result.rows[0];
+        return done(new Error('PENDING_APPROVAL'), null);
       }
 
       done(null, user);
@@ -55,7 +61,7 @@ function generateAccessToken(userId) {
   return jwt.sign(
     { userId },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
   );
 }
 
@@ -145,18 +151,15 @@ router.post('/register', async (req, res, next) => {
       return res.status(409).json({ error: 'Email is already registered.' });
     }
 
-    // Create user
+    // Create user (pending approval)
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
       role: userRole,
       phone: phone || null,
+      is_approved: false,
     });
-
-    // Generate tokens
-    const access_token = generateAccessToken(user.id);
-    const refresh_token = await generateRefreshToken(user.id);
 
     await logAudit({
       userId: user.id,
@@ -168,10 +171,8 @@ router.post('/register', async (req, res, next) => {
     });
 
     res.status(201).json({
-      message: 'Registration successful.',
-      access_token,
-      refresh_token,
-      user,
+      message: 'Cadastro realizado com sucesso. Sua conta precisa ser aprovada por um administrador antes de poder acessar o sistema.',
+      pending_approval: true,
     });
   } catch (err) {
     next(err);
@@ -195,6 +196,14 @@ router.post('/login', async (req, res, next) => {
     const isMatch = await User.comparePassword(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    // Check if account is approved
+    if (!user.is_approved) {
+      return res.status(403).json({
+        error: 'Sua conta ainda não foi aprovada por um administrador. Aguarde a aprovação para acessar o sistema.',
+        pending_approval: true,
+      });
     }
 
     // Generate tokens
@@ -416,6 +425,10 @@ router.get('/google', (req, res, next) => {
 // GET /api/v1/auth/google/callback
 router.get('/google/callback', (req, res, next) => {
   passport.authenticate('google', { session: false }, async (err, user) => {
+    if (err && err.message === 'PENDING_APPROVAL') {
+      const frontendUrl = process.env.FRONTEND_URL || '';
+      return res.redirect(`${frontendUrl}/login?error=pending_approval`);
+    }
     if (err || !user) {
       // Redirect to frontend with error
       const frontendUrl = process.env.FRONTEND_URL || '';

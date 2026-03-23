@@ -114,7 +114,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverAppBar(
-              expandedHeight: 200,
+              expandedHeight: MediaQuery.of(context).size.width < 600 ? 160 : 200,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
                 title: Text(
@@ -330,8 +330,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   }
 
   Widget _buildStatsRow(Project project) {
+    final isSmall = MediaQuery.of(context).size.width < 380;
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmall ? 12 : 16),
       child: Row(
         children: [
           _buildStatCard(
@@ -340,14 +341,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             Icons.task_outlined,
             AppTheme.primaryColor,
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: isSmall ? 8 : 12),
           _buildStatCard(
             'Entregas',
             '${project.deliveryCount}',
             Icons.video_file_outlined,
             AppTheme.secondaryColor,
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: isSmall ? 8 : 12),
           _buildStatCard(
             'Equipe',
             '${project.members.length}',
@@ -361,9 +362,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
 
   Widget _buildStatCard(
       String label, String value, IconData icon, Color color) {
+    final isSmall = MediaQuery.of(context).size.width < 380;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(isSmall ? 10 : 14),
         decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(12),
@@ -371,22 +373,23 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 6),
+            Icon(icon, color: color, size: isSmall ? 18 : 22),
+            SizedBox(height: isSmall ? 4 : 6),
             Text(
               value,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: isSmall ? 14 : 18,
                 fontWeight: FontWeight.w700,
                 color: color,
               ),
             ),
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 11,
+              style: TextStyle(
+                fontSize: isSmall ? 10 : 11,
                 color: AppTheme.textSecondary,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

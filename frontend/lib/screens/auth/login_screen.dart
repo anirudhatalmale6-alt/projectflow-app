@@ -42,6 +42,22 @@ class _LoginScreenState extends State<LoginScreen> {
       replaceCurrentUrl('${uri.origin}$cleanPath');
     }
 
+    if (error == 'pending_approval') {
+      if (mounted) {
+        final auth = context.read<AuthProvider>();
+        auth.clearError();
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sua conta precisa ser aprovada por um administrador antes de poder acessar o sistema.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+      return;
+    }
+
     if (error != null) {
       return;
     }
@@ -126,10 +142,15 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+        child: Center(
+          child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: screenWidth > 600 ? (screenWidth - 400) / 2 : 24,
+            vertical: 24,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -389,6 +410,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

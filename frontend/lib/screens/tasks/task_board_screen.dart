@@ -17,7 +17,7 @@ class TaskBoardScreen extends StatefulWidget {
 }
 
 class _TaskBoardScreenState extends State<TaskBoardScreen> {
-  bool _isKanbanView = true;
+  bool? _isKanbanView;
 
   @override
   void initState() {
@@ -37,6 +37,10 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
     final taskProvider = context.watch<TaskProvider>();
     final auth = context.watch<AuthProvider>();
 
+    // Default to list view on mobile (< 600px), kanban on desktop
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isKanban = _isKanbanView ?? !isMobile;
+
     return Scaffold(
       appBar: widget.projectId != null
           ? null
@@ -49,12 +53,12 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
               actions: [
                 IconButton(
                   icon: Icon(
-                    _isKanbanView ? Icons.view_list : Icons.view_column,
+                    isKanban ? Icons.view_list : Icons.view_column,
                   ),
                   tooltip:
-                      _isKanbanView ? 'Visualização em lista' : 'Kanban',
+                      isKanban ? 'Visualização em lista' : 'Kanban',
                   onPressed: () {
-                    setState(() => _isKanbanView = !_isKanbanView);
+                    setState(() => _isKanbanView = !isKanban);
                   },
                 ),
               ],
@@ -73,7 +77,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
                           arguments: widget.projectId)
                       : null,
                 )
-              : _isKanbanView
+              : isKanban
                   ? _buildKanbanView(taskProvider)
                   : _buildListView(taskProvider),
       floatingActionButton: auth.canAssignTasks
@@ -128,8 +132,10 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
     List tasks,
     Color color,
   ) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final columnWidth = screenWidth < 600 ? (screenWidth * 0.75).clamp(220.0, 280.0) : 280.0;
     return Container(
-      width: 280,
+      width: columnWidth,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),

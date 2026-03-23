@@ -1,16 +1,16 @@
 const pool = require('../config/database');
 
 const Project = {
-  async create({ name, description, clientId, status = 'draft', deadline, budget, currency = 'BRL', createdBy }) {
+  async create({ name, description, clientId, status = 'active', deadline, budget, currency = 'BRL', color, createdBy }) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
       const { rows } = await client.query(
-        `INSERT INTO projects (name, description, client_id, status, deadline, budget, currency, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO projects (name, description, client_id, status, deadline, budget, currency, color, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
-        [name, description || null, clientId || null, status, deadline || null, budget || null, currency, createdBy]
+        [name, description || null, clientId || null, status, deadline || null, budget || null, currency, color || null, createdBy]
       );
       const project = rows[0];
 
@@ -99,7 +99,7 @@ const Project = {
   },
 
   async update(id, fields) {
-    const allowed = ['name', 'description', 'client_id', 'status', 'deadline', 'budget', 'currency'];
+    const allowed = ['name', 'description', 'client_id', 'status', 'deadline', 'budget', 'currency', 'color'];
     const setClauses = [];
     const values = [];
     let paramIndex = 1;

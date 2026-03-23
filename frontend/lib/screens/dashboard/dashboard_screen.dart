@@ -52,7 +52,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Header
             SliverToBoxAdapter(
               child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 56, 20, 24),
+                padding: EdgeInsets.fromLTRB(
+                  MediaQuery.of(context).size.width < 600 ? 16 : 20,
+                  MediaQuery.of(context).size.width < 600 ? 44 : 56,
+                  MediaQuery.of(context).size.width < 600 ? 16 : 20,
+                  MediaQuery.of(context).size.width < 600 ? 16 : 24,
+                ),
                 decoration: const BoxDecoration(
                   gradient: AppTheme.primaryGradient,
                   borderRadius: BorderRadius.only(
@@ -142,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: MediaQuery.of(context).size.width < 600 ? 14 : 20),
                     // Quick stats
                     Row(
                       children: [
@@ -151,19 +156,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           'Projetos',
                           Icons.folder_outlined,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 6),
                         _buildQuickStat(
                           '${tasks.tasks.length}',
                           'Tarefas',
                           Icons.task_outlined,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 6),
                         _buildQuickStat(
                           '${tasks.inProgressTasks.length}',
                           'Ativas',
                           Icons.play_circle_outline,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 6),
                         _buildQuickStat(
                           '${notifs.unreadCount}',
                           'Avisos',
@@ -182,7 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             if (overdueProjects.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 20),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(14),
                     onTap: () {
@@ -274,7 +279,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Stats cards
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -341,7 +346,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Active tasks - clickable
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -367,7 +372,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             if (tasks.inProgressTasks.isEmpty)
               const SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   child: _EmptyTaskCard(),
                 ),
               )
@@ -378,8 +383,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     if (index >= 5) return null;
                     final task = tasks.inProgressTasks[index];
                     return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 4),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 20, vertical: 4),
                       child: _buildTaskTile(task),
                     );
                   },
@@ -394,7 +399,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Recent projects - clickable with status bars
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -434,8 +439,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   (context, index) {
                     final project = projects.projects[index];
                     return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 5),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: MediaQuery.of(context).size.width < 600 ? 16 : 20, vertical: 5),
                       child: _buildProjectCard(project),
                     );
                   },
@@ -530,21 +535,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildQuickStat(String value, String label, IconData icon) {
+    final isSmall = MediaQuery.of(context).size.width < 380;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding: EdgeInsets.symmetric(
+          vertical: isSmall ? 8 : 12,
+          horizontal: isSmall ? 4 : 8,
+        ),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(height: 6),
+            Icon(icon, color: Colors.white, size: isSmall ? 16 : 20),
+            SizedBox(height: isSmall ? 4 : 6),
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 20,
+              style: TextStyle(
+                fontSize: isSmall ? 16 : 20,
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
                 fontFamily: 'Poppins',
@@ -553,12 +562,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: isSmall ? 9 : 10,
                 color: Colors.white.withOpacity(0.75),
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ],
         ),
@@ -568,8 +579,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildStatCard(
       String title, String value, IconData icon, Color color) {
+    final isSmall = MediaQuery.of(context).size.width < 380;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmall ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -579,19 +591,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: isSmall ? 32 : 40,
+            height: isSmall ? 32 : 40,
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 22),
+            child: Icon(icon, color: color, size: isSmall ? 18 : 22),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmall ? 8 : 12),
           Text(
             value,
             style: TextStyle(
-              fontSize: 28,
+              fontSize: isSmall ? 22 : 28,
               fontWeight: FontWeight.w800,
               color: color,
               fontFamily: 'Poppins',
@@ -599,12 +611,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 12,
+            style: TextStyle(
+              fontSize: isSmall ? 11 : 12,
               color: AppTheme.textSecondary,
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w500,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ],
       ),

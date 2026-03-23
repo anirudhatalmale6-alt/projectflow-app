@@ -113,8 +113,14 @@ router.post('/projects/:projectId/tasks', requireProjectRole('manager', 'editor'
     }
 
     // Enrich task with assignees before returning
-    const enriched = await Task.enrichWithAssignees([task]);
-    const taskWithAssignees = enriched[0] || task;
+    let taskWithAssignees = task;
+    try {
+      const enriched = await Task.enrichWithAssignees([task]);
+      taskWithAssignees = enriched[0] || task;
+    } catch (enrichErr) {
+      console.error('Failed to enrich task with assignees:', enrichErr.message);
+      taskWithAssignees.assignees = [];
+    }
 
     // Notify all assignees
     const project = await Project.findById(projectId);
@@ -278,7 +284,7 @@ router.put('/tasks/:id', async (req, res, next) => {
       if (assigneeIds.length > 0) {
         await pool.query('UPDATE tasks SET assignee_id = $1 WHERE id = $2', [assigneeIds[0], req.params.id]);
       } else {
-        await pool.query('UPDATE tasks SET assignee_id = NULL WHERE id = $2', [req.params.id]);
+        await pool.query('UPDATE tasks SET assignee_id = NULL WHERE id = $1', [req.params.id]);
       }
     }
 

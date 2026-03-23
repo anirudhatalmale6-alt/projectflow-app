@@ -129,6 +129,9 @@ class ApiConfig {
   // Admin
   static const String adminUsers = '$apiPrefix/admin/users';
   static String adminUserById(String id) => '$apiPrefix/admin/users/$id';
+  static const String adminPendingUsers = '$apiPrefix/admin/users/pending';
+  static String adminApproveUser(String id) => '$apiPrefix/admin/users/$id/approve';
+  static String adminRejectUser(String id) => '$apiPrefix/admin/users/$id/reject';
   static const String adminStats = '$apiPrefix/admin/stats';
   static const String adminAuditLog = '$apiPrefix/admin/audit-log';
 }

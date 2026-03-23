@@ -121,9 +121,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   project.name,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 18,
+                    fontSize: 14,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                titlePadding: const EdgeInsets.only(left: 48, bottom: 12, right: 16),
                 background: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(

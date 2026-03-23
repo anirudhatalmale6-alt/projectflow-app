@@ -170,12 +170,21 @@ class TaskProvider with ChangeNotifier {
   Future<bool> updateHours(String taskId, double hours) async {
     try {
       await _taskService.updateHours(taskId, hours);
-      final index = _tasks.indexWhere((t) => t.id == taskId);
-      if (index >= 0) {
-        _tasks[index] = _tasks[index].copyWith(actualHours: hours);
-      }
-      if (_currentTask?.id == taskId) {
-        _currentTask = _currentTask!.copyWith(actualHours: hours);
+      // Reload task to get updated timer_started_at from server
+      try {
+        final refreshed = await _taskService.getTask(taskId);
+        final index = _tasks.indexWhere((t) => t.id == taskId);
+        if (index >= 0) _tasks[index] = refreshed;
+        if (_currentTask?.id == taskId) _currentTask = refreshed;
+      } catch (_) {
+        // Fallback: just update hours locally
+        final index = _tasks.indexWhere((t) => t.id == taskId);
+        if (index >= 0) {
+          _tasks[index] = _tasks[index].copyWith(actualHours: hours);
+        }
+        if (_currentTask?.id == taskId) {
+          _currentTask = _currentTask!.copyWith(actualHours: hours);
+        }
       }
       notifyListeners();
       return true;

@@ -245,19 +245,24 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
                         setState(() => _status = value ?? 'active'),
                   ),
                 if (_isEditing) const SizedBox(height: 16),
-                // Deadline
+                // Deadline (optional)
                 InkWell(
                   onTap: _selectDeadline,
                   child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Prazo de Entrega',
-                      prefixIcon: Icon(Icons.calendar_today_outlined),
-                      suffixIcon: Icon(Icons.arrow_drop_down),
+                    decoration: InputDecoration(
+                      labelText: 'Prazo de Entrega (opcional)',
+                      prefixIcon: const Icon(Icons.calendar_today_outlined),
+                      suffixIcon: _deadline != null
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 20),
+                              onPressed: () => setState(() => _deadline = null),
+                            )
+                          : const Icon(Icons.arrow_drop_down),
                     ),
                     child: Text(
                       _deadline != null
                           ? DateFormat('dd/MM/yyyy HH:mm').format(_deadline!)
-                          : 'Selecionar data',
+                          : 'Sem prazo definido',
                       style: TextStyle(
                         color: _deadline != null
                             ? AppTheme.textPrimary

@@ -15,22 +15,31 @@ function parseTags(rows) {
 // Helper: fetch assignees for tasks
 async function enrichWithAssignees(tasks) {
   if (!tasks || tasks.length === 0) return tasks;
-  const taskIds = tasks.map(t => t.id);
-  const { rows: assignees } = await pool.query(
-    `SELECT ta.task_id, u.id, u.name, u.email, u.avatar_url
-     FROM task_assignees ta
-     JOIN users u ON ta.user_id = u.id
-     WHERE ta.task_id = ANY($1)
-     ORDER BY ta.assigned_at ASC`,
-    [taskIds]
-  );
-  const map = {};
-  for (const a of assignees) {
-    if (!map[a.task_id]) map[a.task_id] = [];
-    map[a.task_id].push({ id: a.id, name: a.name, email: a.email, avatar_url: a.avatar_url });
-  }
-  for (const t of tasks) {
-    t.assignees = map[t.id] || [];
+  try {
+    const taskIds = tasks.map(t => t.id);
+    if (taskIds.length === 0) return tasks;
+    const placeholders = taskIds.map(() => '?').join(', ');
+    const { rows: assignees } = await pool.query(
+      `SELECT ta.task_id, u.id, u.name, u.email, u.avatar_url
+       FROM task_assignees ta
+       JOIN users u ON ta.user_id = u.id
+       WHERE ta.task_id IN (${placeholders})
+       ORDER BY ta.assigned_at ASC`,
+      taskIds
+    );
+    const map = {};
+    for (const a of assignees) {
+      if (!map[a.task_id]) map[a.task_id] = [];
+      map[a.task_id].push({ id: a.id, name: a.name, email: a.email, avatar_url: a.avatar_url });
+    }
+    for (const t of tasks) {
+      t.assignees = map[t.id] || [];
+    }
+  } catch (err) {
+    console.error('enrichWithAssignees failed:', err.message, err.stack);
+    for (const t of tasks) {
+      t.assignees = t.assignees || [];
+    }
   }
   return tasks;
 }
@@ -127,7 +136,7 @@ const Task = {
   },
 
   async update(id, fields) {
-    const allowed = ['title', 'description', 'status', 'priority', 'assignee_id', 'due_date', 'parent_task_id', 'estimated_hours', 'actual_hours', 'tags'];
+    const allowed = ['title', 'description', 'status', 'priority', 'assignee_id', 'due_date', 'parent_task_id', 'estimated_hours', 'actual_hours', 'timer_started_at', 'tags'];
     const setClauses = [];
     const values = [];
     let paramIndex = 1;

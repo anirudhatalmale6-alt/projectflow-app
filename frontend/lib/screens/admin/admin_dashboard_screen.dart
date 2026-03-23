@@ -81,6 +81,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         title: const Text('Painel Administrativo'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.people_alt_outlined),
+            onPressed: () => Navigator.pushNamed(context, '/clients'),
+            tooltip: 'Gerenciar Clientes',
+          ),
+          IconButton(
             icon: const Icon(Icons.people_outlined),
             onPressed: () => Navigator.pushNamed(context, '/admin/users'),
             tooltip: 'Gerenciar Usuarios',
@@ -217,6 +222,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () =>
                                 Navigator.pushNamed(context, '/admin/users'),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.people_alt_outlined,
+                                color: AppTheme.secondaryColor),
+                            title: const Text('Gerenciar Clientes'),
+                            subtitle: const Text('Adicionar, editar ou remover'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/clients'),
                           ),
                           const Divider(height: 1),
                           ListTile(

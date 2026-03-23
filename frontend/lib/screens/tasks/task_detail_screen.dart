@@ -609,10 +609,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Hours tracker
+                  // Hours tracker with live timer
                   HoursTracker(
                     estimatedHours: task.estimatedHours,
                     actualHours: task.actualHours,
+                    timerStartedAt: task.timerStartedAt,
                     editable: true,
                     onHoursChanged: (hours) {
                       context

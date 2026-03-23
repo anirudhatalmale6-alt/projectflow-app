@@ -148,6 +148,14 @@ class TaskProvider with ChangeNotifier {
 
     try {
       await _taskService.updateStatus(taskId, status);
+      // Reload task to get updated timer_started_at and actual_hours from server
+      try {
+        final refreshed = await _taskService.getTask(taskId);
+        final idx = _tasks.indexWhere((t) => t.id == taskId);
+        if (idx >= 0) _tasks[idx] = refreshed;
+        if (_currentTask?.id == taskId) _currentTask = refreshed;
+        notifyListeners();
+      } catch (_) {}
       return true;
     } catch (e) {
       // Rollback

@@ -31,6 +31,7 @@ class Task {
   final double? actualHours;
   final List<String> tags;
   final int position;
+  final DateTime? timerStartedAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -49,6 +50,7 @@ class Task {
     this.actualHours,
     this.tags = const [],
     this.position = 0,
+    this.timerStartedAt,
     this.createdAt,
     this.updatedAt,
   });
@@ -76,6 +78,9 @@ class Task {
           : null,
       tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
       position: json['position'] ?? 0,
+      timerStartedAt: json['timer_started_at'] != null
+          ? DateTime.tryParse(json['timer_started_at'])
+          : null,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
           : null,
@@ -92,10 +97,13 @@ class Task {
       if (description != null) 'description': description,
       'status': status,
       'priority': priority,
-      if (assigneeId != null) 'assignee_id': assigneeId,
-      if (dueDate != null) 'due_date': dueDate!.toIso8601String(),
-      if (estimatedHours != null) 'estimated_hours': estimatedHours,
-      if (actualHours != null) 'actual_hours': actualHours,
+      if (assigneeId != null) 'assigneeId': assigneeId,
+      'assigneeIds': assignees.isNotEmpty
+          ? assignees.map((a) => a.id).toList()
+          : (assigneeId != null ? [assigneeId] : []),
+      if (dueDate != null) 'dueDate': dueDate!.toIso8601String(),
+      if (estimatedHours != null) 'estimatedHours': estimatedHours,
+      if (actualHours != null) 'actualHours': actualHours,
       'tags': tags,
       'position': position,
     };
@@ -124,6 +132,8 @@ class Task {
     double? actualHours,
     List<String>? tags,
     int? position,
+    DateTime? timerStartedAt,
+    bool clearTimer = false,
   }) {
     return Task(
       id: id ?? this.id,
@@ -140,6 +150,7 @@ class Task {
       actualHours: actualHours ?? this.actualHours,
       tags: tags ?? this.tags,
       position: position ?? this.position,
+      timerStartedAt: clearTimer ? null : (timerStartedAt ?? this.timerStartedAt),
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

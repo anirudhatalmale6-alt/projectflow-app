@@ -267,30 +267,105 @@ router.put('/tasks/:id', async (req, res, next) => {
     if (actualHours !== undefined) updates.actual_hours = actualHours;
     if (tags !== undefined) updates.tags = tags;
 
+    // Auto time tracking: manage timer on status changes
+    if (status !== undefined && status !== task.status) {
+      if (status === 'in_progress' && !task.timer_started_at) {
+        // Starting work: set timer
+        updates.timer_started_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      } else if (status !== 'in_progress' && task.timer_started_at) {
+        // Stopping work: calculate elapsed time and add to actual_hours
+        const startedAt = new Date(task.timer_started_at);
+        const now = new Date();
+        const elapsedHours = (now - startedAt) / (1000 * 60 * 60);
+        const currentActual = parseFloat(task.actual_hours) || 0;
+        updates.actual_hours = Math.round((currentActual + elapsedHours) * 100) / 100;
+        updates.timer_started_at = null;
+      }
+    }
+
     const updated = await Task.update(req.params.id, updates);
+
+    // Check if actual_hours now exceeds estimated_hours and notify assignees
+    if (updated && updated.estimated_hours && parseFloat(updated.actual_hours) > parseFloat(updated.estimated_hours)) {
+      const prevActual = parseFloat(task.actual_hours) || 0;
+      const wasNotOver = prevActual <= parseFloat(task.estimated_hours);
+      if (wasNotOver) {
+        // Just crossed the threshold - notify all assignees
+        try {
+          const { rows: taskAssignees } = await pool.query(
+            'SELECT user_id FROM task_assignees WHERE task_id = $1',
+            [req.params.id]
+          );
+          const project = await Project.findById(task.project_id);
+          const overNotifications = [];
+          const notifyIds = new Set();
+          for (const ta of taskAssignees) {
+            notifyIds.add(ta.user_id);
+          }
+          if (task.assignee_id) notifyIds.add(task.assignee_id);
+          if (task.reporter_id) notifyIds.add(task.reporter_id);
+
+          for (const uid of notifyIds) {
+            overNotifications.push({
+              userId: uid,
+              type: 'hours_exceeded',
+              title: `Horas excedidas: "${updated.title}"`,
+              message: `A tarefa "${updated.title}" no projeto "${project ? project.name : ''}" ultrapassou as horas estimadas (${parseFloat(updated.actual_hours).toFixed(1)}h / ${updated.estimated_hours}h).`,
+              referenceId: updated.id,
+              referenceType: 'task',
+            });
+          }
+          if (overNotifications.length > 0) {
+            await Notification.createBulk(overNotifications);
+            const io = req.app.get('io');
+            if (io) {
+              for (const uid of notifyIds) {
+                io.to(`user:${uid}`).emit('notification', {
+                  type: 'hours_exceeded',
+                  title: `Horas excedidas: "${updated.title}"`,
+                  task_id: updated.id,
+                });
+              }
+            }
+          }
+        } catch (notifyErr) {
+          console.error('Failed to send hours exceeded notification:', notifyErr.message);
+        }
+      }
+    }
 
     // Sync multiple assignees if provided
     const { assigneeIds } = req.body;
     if (assigneeIds && Array.isArray(assigneeIds)) {
-      // Remove all existing assignees and re-add
-      await pool.query('DELETE FROM task_assignees WHERE task_id = $1', [req.params.id]);
-      for (const uid of assigneeIds) {
-        await pool.query(
-          'INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [req.params.id, uid]
-        );
-      }
-      // Update legacy assignee_id
-      if (assigneeIds.length > 0) {
-        await pool.query('UPDATE tasks SET assignee_id = $1 WHERE id = $2', [assigneeIds[0], req.params.id]);
-      } else {
-        await pool.query('UPDATE tasks SET assignee_id = NULL WHERE id = $1', [req.params.id]);
+      try {
+        // Remove all existing assignees and re-add
+        await pool.query('DELETE FROM task_assignees WHERE task_id = $1', [req.params.id]);
+        for (const uid of assigneeIds) {
+          await pool.query(
+            'INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [req.params.id, uid]
+          );
+        }
+        // Update legacy assignee_id
+        if (assigneeIds.length > 0) {
+          await pool.query('UPDATE tasks SET assignee_id = $1 WHERE id = $2', [assigneeIds[0], req.params.id]);
+        } else {
+          await pool.query('UPDATE tasks SET assignee_id = NULL WHERE id = $1', [req.params.id]);
+        }
+      } catch (assigneeErr) {
+        console.error('Failed to sync task assignees on update:', assigneeErr.message, assigneeErr.stack);
       }
     }
 
     // Enrich with assignees
-    const enrichedArr = await Task.enrichWithAssignees([updated]);
-    const enrichedTask = enrichedArr[0] || updated;
+    let enrichedTask = updated;
+    try {
+      const enrichedArr = await Task.enrichWithAssignees([updated]);
+      enrichedTask = enrichedArr[0] || updated;
+    } catch (enrichErr) {
+      console.error('Failed to enrich task with assignees on update:', enrichErr.message);
+      enrichedTask.assignees = [];
+    }
 
     // Notify on assignment change
     if (assigneeId && assigneeId !== task.assignee_id && assigneeId !== req.user.id) {
@@ -438,7 +513,67 @@ router.patch('/tasks/:id/status', async (req, res, next) => {
       return res.status(400).json({ error: 'Valid status is required.' });
     }
 
-    const updated = await Task.update(req.params.id, { status });
+    // Auto time tracking for quick status change
+    const statusUpdates = { status };
+    if (status !== task.status) {
+      if (status === 'in_progress' && !task.timer_started_at) {
+        statusUpdates.timer_started_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      } else if (status !== 'in_progress' && task.timer_started_at) {
+        const startedAt = new Date(task.timer_started_at);
+        const now = new Date();
+        const elapsedHours = (now - startedAt) / (1000 * 60 * 60);
+        const currentActual = parseFloat(task.actual_hours) || 0;
+        statusUpdates.actual_hours = Math.round((currentActual + elapsedHours) * 100) / 100;
+        statusUpdates.timer_started_at = null;
+      }
+    }
+
+    const updated = await Task.update(req.params.id, statusUpdates);
+
+    // Check if hours exceeded after auto-timer stop
+    if (updated && updated.estimated_hours && parseFloat(updated.actual_hours) > parseFloat(updated.estimated_hours)) {
+      const prevActual = parseFloat(task.actual_hours) || 0;
+      if (prevActual <= parseFloat(task.estimated_hours)) {
+        try {
+          const { rows: taskAssignees } = await pool.query(
+            'SELECT user_id FROM task_assignees WHERE task_id = $1',
+            [req.params.id]
+          );
+          const project = await Project.findById(task.project_id);
+          const notifyIds = new Set();
+          for (const ta of taskAssignees) notifyIds.add(ta.user_id);
+          if (task.assignee_id) notifyIds.add(task.assignee_id);
+          if (task.reporter_id) notifyIds.add(task.reporter_id);
+
+          const overNotifications = [];
+          for (const uid of notifyIds) {
+            overNotifications.push({
+              userId: uid,
+              type: 'hours_exceeded',
+              title: `Horas excedidas: "${updated.title}"`,
+              message: `A tarefa ultrapassou as horas estimadas (${parseFloat(updated.actual_hours).toFixed(1)}h / ${updated.estimated_hours}h).`,
+              referenceId: updated.id,
+              referenceType: 'task',
+            });
+          }
+          if (overNotifications.length > 0) {
+            await Notification.createBulk(overNotifications);
+            const ioNotify = req.app.get('io');
+            if (ioNotify) {
+              for (const uid of notifyIds) {
+                ioNotify.to(`user:${uid}`).emit('notification', {
+                  type: 'hours_exceeded',
+                  title: `Horas excedidas: "${updated.title}"`,
+                  task_id: updated.id,
+                });
+              }
+            }
+          }
+        } catch (notifyErr) {
+          console.error('Failed to send hours exceeded notification:', notifyErr.message);
+        }
+      }
+    }
 
     // Notify on status change
     if (status !== task.status) {
@@ -543,6 +678,24 @@ const positionHandler = async (req, res, next) => {
 
     if (position === undefined || typeof position !== 'number' || position < 0) {
       return res.status(400).json({ error: 'Valid position (non-negative integer) is required.' });
+    }
+
+    // Auto time tracking for kanban drag
+    if (task.status !== status) {
+      if (status === 'in_progress' && !task.timer_started_at) {
+        await Task.update(req.params.id, {
+          timer_started_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        });
+      } else if (status !== 'in_progress' && task.timer_started_at) {
+        const startedAt = new Date(task.timer_started_at);
+        const now = new Date();
+        const elapsedHours = (now - startedAt) / (1000 * 60 * 60);
+        const currentActual = parseFloat(task.actual_hours) || 0;
+        await Task.update(req.params.id, {
+          actual_hours: Math.round((currentActual + elapsedHours) * 100) / 100,
+          timer_started_at: null,
+        });
+      }
     }
 
     const updated = await Task.updatePosition(req.params.id, status, position);

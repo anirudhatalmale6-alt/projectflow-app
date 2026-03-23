@@ -107,44 +107,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
                           ),
                         ),
-                        // Notification bell
-                        GestureDetector(
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/notifications'),
-                          child: Stack(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.notifications_outlined,
-                                    color: Colors.white, size: 22),
-                              ),
-                              if (notifs.unreadCount > 0)
-                                Positioned(
-                                  right: 0,
-                                  top: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      '${notifs.unreadCount > 9 ? '9+' : notifs.unreadCount}',
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                        // Spacer for notification bell (now in global overlay)
+                        const SizedBox(width: 40),
                       ],
                     ),
                     SizedBox(height: MediaQuery.of(context).size.width < 600 ? 14 : 20),

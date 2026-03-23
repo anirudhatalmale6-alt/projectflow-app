@@ -517,3 +517,12 @@ DEALLOCATE PREPARE stmt;
 
 -- Set existing users as approved (so they are not locked out)
 UPDATE users SET is_approved = TRUE WHERE is_approved = FALSE;
+
+-- ============================================================
+-- Add timer_started_at column to tasks (automatic time tracking)
+-- ============================================================
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'tasks' AND column_name = 'timer_started_at');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE tasks ADD COLUMN timer_started_at DATETIME NULL DEFAULT NULL AFTER actual_hours', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

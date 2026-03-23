@@ -1,3 +1,17 @@
+import 'dart:convert';
+
+List<String> _parseTags(dynamic tags) {
+  if (tags == null) return [];
+  if (tags is List) return List<String>.from(tags);
+  if (tags is String) {
+    try {
+      final decoded = jsonDecode(tags);
+      if (decoded is List) return List<String>.from(decoded);
+    } catch (_) {}
+  }
+  return [];
+}
+
 class TaskAssignee {
   final String id;
   final String name;
@@ -76,7 +90,7 @@ class Task {
       actualHours: json['actual_hours'] != null
           ? double.tryParse(json['actual_hours'].toString())
           : null,
-      tags: json['tags'] != null ? List<String>.from(json['tags']) : [],
+      tags: _parseTags(json['tags']),
       position: json['position'] ?? 0,
       timerStartedAt: json['timer_started_at'] != null
           ? DateTime.tryParse(json['timer_started_at'])

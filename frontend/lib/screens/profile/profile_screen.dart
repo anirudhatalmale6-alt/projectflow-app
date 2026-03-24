@@ -244,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icons.notifications_outlined,
                     title: 'Notificações',
                     subtitle: 'Gerenciar preferências de notificação',
-                    onTap: () {},
+                    onTap: () => _showNotificationSettings(),
                   ),
                   _buildSettingTile(
                     icon: Icons.language,
@@ -408,6 +408,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         trailing: const Icon(Icons.chevron_right, color: AppTheme.textTertiary),
         onTap: onTap,
+      ),
+    );
+  }
+
+  void _showNotificationSettings() {
+    bool taskUpdates = true;
+    bool deliveryUpdates = true;
+    bool commentUpdates = true;
+    bool projectUpdates = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Notificações'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                title: const Text('Tarefas', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('Atualizacoes de tarefas', style: TextStyle(fontSize: 12)),
+                value: taskUpdates,
+                onChanged: (v) => setDialogState(() => taskUpdates = v),
+                dense: true,
+              ),
+              SwitchListTile(
+                title: const Text('Entregas', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('Novas entregas e aprovacoes', style: TextStyle(fontSize: 12)),
+                value: deliveryUpdates,
+                onChanged: (v) => setDialogState(() => deliveryUpdates = v),
+                dense: true,
+              ),
+              SwitchListTile(
+                title: const Text('Comentarios', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('Novos comentarios', style: TextStyle(fontSize: 12)),
+                value: commentUpdates,
+                onChanged: (v) => setDialogState(() => commentUpdates = v),
+                dense: true,
+              ),
+              SwitchListTile(
+                title: const Text('Projetos', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('Mudancas em projetos', style: TextStyle(fontSize: 12)),
+                value: projectUpdates,
+                onChanged: (v) => setDialogState(() => projectUpdates = v),
+                dense: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Fechar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Preferencias salvas!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
       ),
     );
   }

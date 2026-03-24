@@ -249,7 +249,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             title: const Text('Log de Auditoria'),
                             subtitle: const Text('Historico de acoes'),
                             trailing: const Icon(Icons.chevron_right),
-                            onTap: () {},
+                            onTap: () => Navigator.pushNamed(context, '/admin/audit-log'),
                           ),
                         ],
                       ),

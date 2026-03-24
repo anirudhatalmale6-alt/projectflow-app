@@ -35,6 +35,7 @@ import 'screens/notifications/notifications_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/admin_users_screen.dart';
+import 'screens/admin/audit_log_screen.dart';
 import 'screens/chat/chat_channels_screen.dart';
 import 'screens/chat/chat_messages_screen.dart';
 import 'screens/jobs/jobs_list_screen.dart';
@@ -158,6 +159,7 @@ class _DuozzFlowAppState extends State<DuozzFlowApp> with WidgetsBindingObserver
           '/profile': (context) => const ProfileScreen(),
           '/admin': (context) => const AdminDashboardScreen(),
           '/admin/users': (context) => const AdminUsersScreen(),
+          '/admin/audit-log': (context) => const AuditLogScreen(),
           '/chat': (context) => const ChatChannelsScreen(),
           '/chat/messages': (context) => const ChatMessagesScreen(),
           '/jobs': (context) => const JobsListScreen(),

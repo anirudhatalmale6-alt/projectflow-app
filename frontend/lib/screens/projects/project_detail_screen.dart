@@ -18,6 +18,8 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/role_badge.dart';
 import '../../providers/job_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../providers/calendar_provider.dart';
+import '../../models/calendar_event.dart';
 import '../../models/chat_message.dart';
 import '../../models/job.dart';
 
@@ -32,6 +34,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String? _projectId;
+  bool _calendarLoaded = false;
+  DateTime _calendarMonth = DateTime.now();
+  DateTime? _selectedCalDay;
 
   @override
   void initState() {
@@ -117,14 +122,17 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               expandedHeight: MediaQuery.of(context).size.width < 600 ? 160 : 200,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  project.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                title: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+                  child: Text(
+                    project.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 titlePadding: const EdgeInsets.only(left: 48, bottom: 12, right: 16),
                 background: Container(
@@ -791,30 +799,197 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     );
   }
 
+  void _loadCalendarMonth() {
+    if (_projectId == null) return;
+    final start = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final end = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0, 23, 59);
+    context.read<CalendarProvider>().loadEvents(_projectId!, start: start, end: end);
+  }
+
   Widget _buildCalendarTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.calendar_month, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          const Text(
-            'Calendário do Projeto',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+    final calProvider = context.watch<CalendarProvider>();
+    final today = DateTime.now();
+
+    // Auto-load events once
+    if (!_calendarLoaded && _projectId != null) {
+      _calendarLoaded = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadCalendarMonth());
+    }
+
+    final dayEvents = _selectedCalDay != null
+        ? calProvider.eventsForDay(_selectedCalDay!)
+        : <CalendarEvent>[];
+
+    // Calendar grid
+    final firstDay = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final lastDay = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
+    final startOffset = firstDay.weekday % 7;
+    final totalDays = lastDay.day;
+    final totalCells = startOffset + totalDays;
+    final rows = (totalCells / 7).ceil();
+
+    return Column(
+      children: [
+        // Month header with navigation
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left, size: 20),
+                onPressed: () {
+                  setState(() {
+                    _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month - 1);
+                    _selectedCalDay = null;
+                  });
+                  _loadCalendarMonth();
+                },
+              ),
+              Text(
+                DateFormat('MMMM yyyy', 'pt_BR').format(_calendarMonth),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, size: 20),
+                onPressed: () {
+                  setState(() {
+                    _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1);
+                    _selectedCalDay = null;
+                  });
+                  _loadCalendarMonth();
+                },
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Prazos, reuniões e marcos',
-            style: TextStyle(color: Colors.grey[600]),
+        ),
+        // Week day headers
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
+                .map((d) => Expanded(
+                      child: Center(
+                        child: Text(d, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey[600])),
+                      ),
+                    ))
+                .toList(),
           ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/calendar', arguments: _projectId),
-            icon: const Icon(Icons.calendar_today),
-            label: const Text('Abrir Calendário'),
+        ),
+        const SizedBox(height: 4),
+        // Calendar grid
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            children: List.generate(rows, (row) {
+              return Row(
+                children: List.generate(7, (col) {
+                  final cellIndex = row * 7 + col;
+                  final dayNum = cellIndex - startOffset + 1;
+                  if (dayNum < 1 || dayNum > totalDays) {
+                    return const Expanded(child: SizedBox(height: 38));
+                  }
+                  final date = DateTime(_calendarMonth.year, _calendarMonth.month, dayNum);
+                  final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+                  final isSelected = _selectedCalDay != null &&
+                      date.year == _selectedCalDay!.year &&
+                      date.month == _selectedCalDay!.month &&
+                      date.day == _selectedCalDay!.day;
+                  final hasEvents = calProvider.eventsForDay(date).isNotEmpty;
+
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedCalDay = date),
+                      child: Container(
+                        height: 38,
+                        margin: const EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppTheme.primaryColor
+                              : isToday
+                                  ? AppTheme.primaryColor.withAlpha(25)
+                                  : null,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '$dayNum',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? Colors.white : isToday ? AppTheme.primaryColor : Colors.black87,
+                              ),
+                            ),
+                            if (hasEvents)
+                              Container(
+                                width: 4, height: 4,
+                                margin: const EdgeInsets.only(top: 1),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isSelected ? Colors.white : AppTheme.primaryColor,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              );
+            }),
           ),
-        ],
-      ),
+        ),
+        const Divider(height: 1),
+        // Events for selected day
+        Expanded(
+          child: _selectedCalDay == null
+              ? Center(
+                  child: Text('Selecione um dia para ver eventos', style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+                )
+              : dayEvents.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.event_available, size: 40, color: Colors.grey[400]),
+                          const SizedBox(height: 8),
+                          Text('Nenhum evento neste dia', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: dayEvents.length,
+                      itemBuilder: (context, index) {
+                        final event = dayEvents[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 4),
+                          child: ListTile(
+                            leading: Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                event.type == 'deadline' ? Icons.flag : Icons.event,
+                                color: AppTheme.primaryColor, size: 18,
+                              ),
+                            ),
+                            title: Text(event.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                            subtitle: Text(
+                              '${DateFormat('HH:mm').format(event.startTime)} - ${DateFormat('HH:mm').format(event.endTime)}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            dense: true,
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
     );
   }
 

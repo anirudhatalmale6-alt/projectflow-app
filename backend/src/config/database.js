@@ -1,6 +1,9 @@
 const mysql = require('mysql2/promise');
 const { v4: uuidv4 } = require('uuid');
 
+// Tables that use INT AUTO_INCREMENT for id (skip UUID injection)
+const AUTO_INCREMENT_TABLES = ['project_members', 'push_subscriptions', 'refresh_tokens', 'role_permissions', 'audit_log', 'task_assignees'];
+
 // Create MySQL pool
 const poolConfig = {
   database: process.env.DB_NAME || 'duozzflow',
@@ -179,14 +182,14 @@ async function query(text, params) {
       finalSql = finalSql.trimEnd() + ` ON DUPLICATE KEY UPDATE ${mysqlSet}`;
     }
 
-    // For INSERT without explicit 'id', inject a UUID
+    // For INSERT without explicit 'id', inject a UUID (skip auto-increment tables)
     const isInsertFinal = /^\s*INSERT/i.test(finalSql);
     let generatedId = null;
     if (isInsertFinal) {
       const colsMatch = finalSql.match(/INSERT\s+(?:IGNORE\s+)?INTO\s+\w+\s*\(([^)]+)\)/i);
       if (colsMatch) {
         const cols = colsMatch[1].split(',').map(c => c.trim());
-        if (!cols.includes('id')) {
+        if (!cols.includes('id') && !AUTO_INCREMENT_TABLES.includes(table)) {
           // Auto-inject id column and UUID value
           generatedId = uuidv4();
           const newCols = ['id', ...cols].join(', ');
@@ -318,14 +321,15 @@ async function connect() {
           finalSql = finalSql.trimEnd() + ` ON DUPLICATE KEY UPDATE ${mysqlSet}`;
         }
 
-        // For INSERT without explicit 'id', inject a UUID
+        // For INSERT without explicit 'id', inject a UUID (skip auto-increment tables)
         const isInsertFinal = /^\s*INSERT/i.test(finalSql);
+        const connTable = extractTable(finalSql);
         let generatedId = null;
         if (isInsertFinal) {
           const colsMatch = finalSql.match(/INSERT\s+(?:IGNORE\s+)?INTO\s+\w+\s*\(([^)]+)\)/i);
           if (colsMatch) {
             const cols = colsMatch[1].split(',').map(c => c.trim());
-            if (!cols.includes('id')) {
+            if (!cols.includes('id') && !AUTO_INCREMENT_TABLES.includes(connTable)) {
               generatedId = uuidv4();
               const newCols = ['id', ...cols].join(', ');
               finalSql = finalSql.replace(
@@ -339,7 +343,7 @@ async function connect() {
         }
 
         const [result] = await conn.query(finalSql, convertedParams);
-        const table = extractTable(finalSql);
+        const table = connTable;
         if (table) {
           const selectCols = returningCols === '*' ? '*' : returningCols;
 

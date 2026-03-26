@@ -9,6 +9,22 @@ const pool = require('../config/database');
 
 const router = express.Router();
 
+/**
+ * Get all project members who should be notified about project activity.
+ * Returns user IDs of managers and admins in the project, excluding the actor.
+ */
+async function getProjectNotifyIds(projectId, excludeUserId) {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT pm.user_id FROM project_members pm
+     JOIN users u ON pm.user_id = u.id
+     WHERE pm.project_id = $1
+       AND (pm.role IN ('manager', 'admin') OR u.role IN ('manager', 'admin'))
+       AND pm.user_id != $2`,
+    [projectId, excludeUserId]
+  );
+  return rows.map(r => r.user_id);
+}
+
 // All routes require auth
 router.use(auth);
 
@@ -125,24 +141,63 @@ router.post('/projects/:projectId/tasks', requireProjectRole('manager', 'editor'
     // Notify all assignees
     const project = await Project.findById(projectId);
     const io = req.app.get('io');
+    const notifiedIds = new Set();
     for (const uid of idsToAssign) {
       if (uid !== req.user.id) {
+        notifiedIds.add(uid);
         await Notification.create({
           userId: uid,
           type: 'task_assigned',
-          title: `New task assigned: "${task.title}"`,
-          message: `${req.user.name} assigned you a task in "${project.name}".`,
+          title: `Nova tarefa atribuída: "${task.title}"`,
+          message: `${req.user.name} atribuiu uma tarefa a você no projeto "${project.name}".`,
           referenceId: task.id,
           referenceType: 'task',
         });
         if (io) {
           io.to(`user:${uid}`).emit('notification', {
             type: 'task_assigned',
-            title: `New task assigned: "${task.title}"`,
+            title: `Nova tarefa atribuída: "${task.title}"`,
             task_id: task.id,
           });
           io.to(`user:${uid}`).emit('task_assigned', taskWithAssignees);
         }
+      }
+    }
+
+    // Notify project managers about new task creation
+    const managerIds = await getProjectNotifyIds(projectId, req.user.id);
+    for (const uid of managerIds) {
+      if (!notifiedIds.has(uid)) {
+        await Notification.create({
+          userId: uid,
+          type: 'task_updated',
+          title: `Nova tarefa criada: "${task.title}"`,
+          message: `${req.user.name} criou uma tarefa no projeto "${project.name}".`,
+          referenceId: task.id,
+          referenceType: 'task',
+        });
+        if (io) {
+          io.to(`user:${uid}`).emit('notification', {
+            type: 'task_updated',
+            title: `Nova tarefa criada: "${task.title}"`,
+            task_id: task.id,
+          });
+        }
+      }
+    }
+
+    // Auto-create calendar event if task has a due date
+    if (dueDate) {
+      try {
+        const startTime = new Date(dueDate);
+        const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // +1 hour
+        await pool.query(
+          `INSERT INTO calendar_events (project_id, title, description, start_time, end_time, type, created_by)
+           VALUES ($1, $2, $3, $4, $5, 'deadline', $6)`,
+          [projectId, task.title, task.description || '', startTime, endTime, req.user.id]
+        );
+      } catch (calErr) {
+        console.error('Failed to auto-create calendar event:', calErr.message);
       }
     }
 
@@ -338,6 +393,21 @@ router.put('/tasks/:id', async (req, res, next) => {
       }
     }
 
+    // Auto-create calendar event when due date is set/changed
+    if (dueDate !== undefined && dueDate && dueDate !== (task.due_date ? new Date(task.due_date).toISOString() : null)) {
+      try {
+        const startTime = new Date(dueDate);
+        const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+        await pool.query(
+          `INSERT INTO calendar_events (project_id, title, description, start_time, end_time, type, created_by)
+           VALUES ($1, $2, $3, $4, $5, 'deadline', $6)`,
+          [task.project_id, updated.title || task.title, updated.description || task.description || '', startTime, endTime, req.user.id]
+        );
+      } catch (calErr) {
+        console.error('Failed to auto-create calendar event on task update:', calErr.message);
+      }
+    }
+
     // Sync multiple assignees if provided
     const { assigneeIds } = req.body;
     if (assigneeIds && Array.isArray(assigneeIds)) {
@@ -403,17 +473,22 @@ router.put('/tasks/:id', async (req, res, next) => {
 
     // Notify on status change
     if (status && status !== task.status) {
+      const statusLabels = { todo: 'A fazer', in_progress: 'Em andamento', review: 'Em revisão', done: 'Concluído' };
       const notifyUserIds = new Set();
       if (task.assignee_id && task.assignee_id !== req.user.id) notifyUserIds.add(task.assignee_id);
       if (task.reporter_id && task.reporter_id !== req.user.id) notifyUserIds.add(task.reporter_id);
+
+      // Also notify project managers
+      const statusManagerIds = await getProjectNotifyIds(task.project_id, req.user.id);
+      for (const mid of statusManagerIds) notifyUserIds.add(mid);
 
       const notifications = [];
       for (const uid of notifyUserIds) {
         notifications.push({
           userId: uid,
           type: 'task_updated',
-          title: `Task status changed: "${updated.title}"`,
-          message: `${req.user.name} changed status from "${task.status}" to "${status}".`,
+          title: `Tarefa "${updated.title}" alterada`,
+          message: `${req.user.name} alterou o status de "${statusLabels[task.status] || task.status}" para "${statusLabels[status] || status}".`,
           referenceId: updated.id,
           referenceType: 'task',
         });
@@ -425,7 +500,7 @@ router.put('/tasks/:id', async (req, res, next) => {
           for (const uid of notifyUserIds) {
             io.to(`user:${uid}`).emit('notification', {
               type: 'task_updated',
-              title: `Task status changed: "${updated.title}"`,
+              title: `Tarefa "${updated.title}" alterada`,
               task_id: updated.id,
             });
           }
@@ -600,17 +675,22 @@ router.patch('/tasks/:id/status', async (req, res, next) => {
 
     // Notify on status change
     if (status !== task.status) {
+      const statusLabels2 = { todo: 'A fazer', in_progress: 'Em andamento', review: 'Em revisão', done: 'Concluído' };
       const notifyUserIds = new Set();
       if (task.assignee_id && task.assignee_id !== req.user.id) notifyUserIds.add(task.assignee_id);
       if (task.reporter_id && task.reporter_id !== req.user.id) notifyUserIds.add(task.reporter_id);
+
+      // Also notify project managers
+      const statusMgrIds = await getProjectNotifyIds(task.project_id, req.user.id);
+      for (const mid of statusMgrIds) notifyUserIds.add(mid);
 
       const notifications = [];
       for (const uid of notifyUserIds) {
         notifications.push({
           userId: uid,
           type: 'task_updated',
-          title: `Task status changed: "${updated.title}"`,
-          message: `${req.user.name} changed status from "${task.status}" to "${status}".`,
+          title: `Tarefa "${updated.title}" alterada`,
+          message: `${req.user.name} alterou o status de "${statusLabels2[task.status] || task.status}" para "${statusLabels2[status] || status}".`,
           referenceId: updated.id,
           referenceType: 'task',
         });
@@ -622,6 +702,7 @@ router.patch('/tasks/:id/status', async (req, res, next) => {
           for (const uid of notifyUserIds) {
             io.to(`user:${uid}`).emit('notification', {
               type: 'task_updated',
+              title: `Tarefa "${updated.title}" alterada`,
               task_id: updated.id,
             });
           }

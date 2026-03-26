@@ -28,4 +28,20 @@ class CalendarService {
   Future<void> deleteEvent(String id) async {
     await _api.delete(ApiConfig.calendarEventById(id));
   }
+
+  // Google Calendar Sync
+  Future<Map<String, dynamic>> getGoogleCalendarStatus() async {
+    return await _api.get(ApiConfig.googleCalendarStatus);
+  }
+
+  Future<Map<String, dynamic>> importFromGoogle(String projectId, String start, String end) async {
+    return await _api.post(ApiConfig.googleCalendarImport(projectId), body: {
+      'start': start,
+      'end': end,
+    });
+  }
+
+  Future<Map<String, dynamic>> exportToGoogle(String projectId) async {
+    return await _api.post(ApiConfig.googleCalendarExport(projectId));
+  }
 }

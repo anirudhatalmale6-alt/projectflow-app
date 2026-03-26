@@ -203,8 +203,62 @@ function _timeUntil(date) {
 }
 
 /**
- * Start the deadline checker interval.
- * Runs every 30 minutes.
+ * Reminder system: re-notify users who have unread notifications older than 1h30.
+ * Groups unread notifications and sends a single reminder per user.
+ * Only sends one reminder per 1h30 per user.
+ */
+async function checkUnreadReminders(io) {
+  try {
+    // Find users with unread notifications older than 2 hours
+    // but only if we haven't sent a reminder in the last 4 hours
+    const { rows: usersWithUnread } = await pool.query(`
+      SELECT n.user_id, COUNT(*) as unread_count
+      FROM notifications n
+      WHERE n.is_read = FALSE
+        AND n.created_at < NOW() - INTERVAL 90 MINUTE
+        AND NOT EXISTS (
+          SELECT 1 FROM notifications r
+          WHERE r.user_id = n.user_id
+            AND r.type = 'reminder'
+            AND r.created_at > NOW() - INTERVAL 90 MINUTE
+        )
+      GROUP BY n.user_id
+      HAVING COUNT(*) > 0
+    `);
+
+    for (const row of usersWithUnread) {
+      const count = parseInt(row.unread_count) || 0;
+      if (count === 0) continue;
+
+      await Notification.create({
+        userId: row.user_id,
+        type: 'reminder',
+        title: `Você tem ${count} notificação${count > 1 ? 'ões' : ''} não lida${count > 1 ? 's' : ''}`,
+        message: `Existem ${count} notificação${count > 1 ? 'ões' : ''} pendente${count > 1 ? 's' : ''} aguardando sua atenção.`,
+        referenceId: null,
+        referenceType: null,
+      });
+
+      if (io) {
+        io.to(`user:${row.user_id}`).emit('notification', {
+          type: 'reminder',
+          title: `Você tem ${count} notificação${count > 1 ? 'ões' : ''} não lida${count > 1 ? 's' : ''}`,
+          unread_count: count,
+        });
+      }
+    }
+
+    if (usersWithUnread.length > 0) {
+      console.log(`[Reminder] Sent reminders to ${usersWithUnread.length} user(s)`);
+    }
+  } catch (err) {
+    console.error('[Reminder] Error:', err.message);
+  }
+}
+
+/**
+ * Start the deadline checker and reminder intervals.
+ * Deadlines: every 30 minutes. Reminders: every 1h30.
  */
 function startDeadlineChecker(io) {
   // Run immediately on startup
@@ -212,6 +266,11 @@ function startDeadlineChecker(io) {
   // Then every 30 minutes
   setInterval(() => checkDeadlines(io), 30 * 60 * 1000);
   console.log('[DeadlineChecker] Started - checking every 30 minutes');
+
+  // Unread notification reminders - every 1h30
+  setTimeout(() => checkUnreadReminders(io), 5 * 60 * 1000); // First run after 5 minutes
+  setInterval(() => checkUnreadReminders(io), 90 * 60 * 1000);
+  console.log('[Reminder] Started - checking every 1h30');
 }
 
-module.exports = { checkDeadlines, startDeadlineChecker };
+module.exports = { checkDeadlines, checkUnreadReminders, startDeadlineChecker };

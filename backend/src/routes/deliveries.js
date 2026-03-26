@@ -75,19 +75,38 @@ router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'ed
       requiresApproval: requires_approval !== undefined ? requires_approval : true,
     });
 
-    // Notify project managers about the new delivery
+    // Notify project managers and admins about the new delivery
     const members = await Project.getMembers(projectId);
     const project = await Project.findById(projectId);
-    const managerIds = members
-      .filter(m => m.project_role === 'manager' && m.id !== req.user.id)
-      .map(m => m.id);
+    const notifyIds = new Set();
 
-    if (managerIds.length > 0) {
-      const notifications = managerIds.map(uid => ({
+    // Add managers and admins from project members
+    for (const m of members) {
+      if (m.id !== req.user.id && (m.project_role === 'manager' || m.role === 'admin' || m.role === 'manager')) {
+        notifyIds.add(m.id);
+      }
+    }
+
+    // If delivery is linked to a task, also notify task assignee and reporter
+    if (delivery.task_id) {
+      try {
+        const { rows: taskRows } = await pool.query(
+          'SELECT assignee_id, reporter_id FROM tasks WHERE id = $1',
+          [delivery.task_id]
+        );
+        if (taskRows.length > 0) {
+          if (taskRows[0].assignee_id && taskRows[0].assignee_id !== req.user.id) notifyIds.add(taskRows[0].assignee_id);
+          if (taskRows[0].reporter_id && taskRows[0].reporter_id !== req.user.id) notifyIds.add(taskRows[0].reporter_id);
+        }
+      } catch (_) {}
+    }
+
+    if (notifyIds.size > 0) {
+      const notifications = [...notifyIds].map(uid => ({
         userId: uid,
         type: 'delivery_uploaded',
-        title: `New delivery: "${delivery.title}" v${delivery.version}`,
-        message: `${req.user.name} uploaded a delivery in "${project.name}".`,
+        title: `Nova entrega: "${delivery.title}" v${delivery.version}`,
+        message: `${req.user.name} enviou uma entrega no projeto "${project.name}".`,
         referenceId: delivery.id,
         referenceType: 'delivery',
       }));
@@ -95,10 +114,10 @@ router.post('/projects/:projectId/deliveries', requireProjectRole('manager', 'ed
 
       const io = req.app.get('io');
       if (io) {
-        for (const uid of managerIds) {
+        for (const uid of notifyIds) {
           io.to(`user:${uid}`).emit('notification', {
             type: 'delivery_uploaded',
-            title: `New delivery: "${delivery.title}" v${delivery.version}`,
+            title: `Nova entrega: "${delivery.title}" v${delivery.version}`,
             delivery_id: delivery.id,
           });
         }

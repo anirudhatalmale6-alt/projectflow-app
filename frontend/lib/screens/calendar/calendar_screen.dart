@@ -323,6 +323,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     DateTime startDate = _selectedDay ?? DateTime.now();
     TimeOfDay startTime = const TimeOfDay(hour: 9, minute: 0);
     TimeOfDay endTime = const TimeOfDay(hour: 10, minute: 0);
+    final calProvider = context.read<CalendarProvider>();
+    bool syncGoogle = calProvider.googleLinked;
 
     showModalBottomSheet(
       context: context,
@@ -407,6 +409,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ],
               ),
+              if (calProvider.googleLinked) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: syncGoogle,
+                      onChanged: (v) => setSheetState(() => syncGoogle = v ?? false),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 4),
+                    const Expanded(
+                      child: Text('Sincronizar com Google Calendar', style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -432,6 +451,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         'type': selectedType,
                         'start_time': startDt.toIso8601String(),
                         'end_time': endDt.toIso8601String(),
+                        'sync_google': syncGoogle,
                       },
                     );
                     if (event != null && ctx.mounted) Navigator.pop(ctx);

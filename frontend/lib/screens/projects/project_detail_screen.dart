@@ -42,11 +42,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() {}); // Rebuild to update FAB
-      }
-    });
+    _tabController.addListener(_onTabChanged);
+  }
+
+  int _lastTabIndex = 0;
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging && _tabController.index != _lastTabIndex) {
+      _lastTabIndex = _tabController.index;
+      setState(() {}); // Only rebuild when tab actually changes
+    }
   }
 
   @override
@@ -68,6 +73,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -813,7 +819,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     // Auto-load events once
     if (!_calendarLoaded && _projectId != null) {
       _calendarLoaded = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadCalendarMonth());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadCalendarMonth();
+        calProvider.checkGoogleStatus();
+      });
     }
 
     final dayEvents = _selectedCalDay != null
@@ -830,6 +839,43 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
 
     return Column(
       children: [
+        // Google Calendar sync bar
+        if (calProvider.googleLinked)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F7FF),
+              border: Border(bottom: BorderSide(color: Colors.blue.shade100)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.sync, size: 16, color: Colors.blue.shade700),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    calProvider.syncMessage ?? 'Google Calendar conectado',
+                    style: TextStyle(fontSize: 11, color: Colors.blue.shade700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (calProvider.isSyncing)
+                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                else ...[
+                  _buildSyncButton(
+                    'Importar',
+                    Icons.cloud_download_outlined,
+                    () => _importFromGoogle(calProvider),
+                  ),
+                  const SizedBox(width: 4),
+                  _buildSyncButton(
+                    'Exportar',
+                    Icons.cloud_upload_outlined,
+                    () => _exportToGoogle(calProvider),
+                  ),
+                ],
+              ],
+            ),
+          ),
         // Month header with navigation
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -850,15 +896,25 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                 DateFormat('MMMM yyyy', 'pt_BR').format(_calendarMonth),
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right, size: 20),
-                onPressed: () {
-                  setState(() {
-                    _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1);
-                    _selectedCalDay = null;
-                  });
-                  _loadCalendarMonth();
-                },
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right, size: 20),
+                    onPressed: () {
+                      setState(() {
+                        _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1);
+                        _selectedCalDay = null;
+                      });
+                      _loadCalendarMonth();
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline, size: 22, color: AppTheme.primaryColor),
+                    tooltip: 'Novo Evento',
+                    onPressed: _showCreateEventDialog,
+                  ),
+                ],
               ),
             ],
           ),
@@ -991,6 +1047,170 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         ),
       ],
     );
+  }
+
+  Widget _buildSyncButton(String label, IconData icon, VoidCallback onPressed) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: Colors.blue.shade700),
+            const SizedBox(width: 3),
+            Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateEventDialog() {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    DateTime startDate = _selectedCalDay ?? DateTime.now();
+    TimeOfDay startTime = const TimeOfDay(hour: 9, minute: 0);
+    TimeOfDay endTime = const TimeOfDay(hour: 10, minute: 0);
+    String eventType = 'deadline';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Novo Evento'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Titulo'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Descricao (opcional)'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: eventType,
+                  decoration: const InputDecoration(labelText: 'Tipo'),
+                  items: const [
+                    DropdownMenuItem(value: 'deadline', child: Text('Prazo')),
+                    DropdownMenuItem(value: 'meeting', child: Text('Reuniao')),
+                    DropdownMenuItem(value: 'review', child: Text('Revisao')),
+                    DropdownMenuItem(value: 'milestone', child: Text('Marco')),
+                  ],
+                  onChanged: (v) => setDialogState(() => eventType = v!),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Data', style: TextStyle(fontSize: 13)),
+                  subtitle: Text(DateFormat('dd/MM/yyyy').format(startDate)),
+                  trailing: const Icon(Icons.calendar_today, size: 18),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: startDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (picked != null) setDialogState(() => startDate = picked);
+                  },
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Inicio', style: TextStyle(fontSize: 13)),
+                        subtitle: Text(startTime.format(ctx)),
+                        onTap: () async {
+                          final picked = await showTimePicker(context: ctx, initialTime: startTime);
+                          if (picked != null) setDialogState(() => startTime = picked);
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Fim', style: TextStyle(fontSize: 13)),
+                        subtitle: Text(endTime.format(ctx)),
+                        onTap: () async {
+                          final picked = await showTimePicker(context: ctx, initialTime: endTime);
+                          if (picked != null) setDialogState(() => endTime = picked);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                titleCtrl.dispose();
+                descCtrl.dispose();
+              },
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx);
+
+                final start = DateTime(startDate.year, startDate.month, startDate.day, startTime.hour, startTime.minute);
+                final end = DateTime(startDate.year, startDate.month, startDate.day, endTime.hour, endTime.minute);
+
+                final calProvider = context.read<CalendarProvider>();
+                await calProvider.createEvent(_projectId!, {
+                  'title': titleCtrl.text.trim(),
+                  'description': descCtrl.text.trim(),
+                  'start_date': start.toIso8601String(),
+                  'end_date': end.toIso8601String(),
+                  'event_type': eventType,
+                });
+
+                titleCtrl.dispose();
+                descCtrl.dispose();
+                _loadCalendarMonth();
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Evento criado!'),
+                      backgroundColor: AppTheme.successColor,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Criar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _importFromGoogle(CalendarProvider calProvider) {
+    final start = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
+    final end = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0, 23, 59, 59);
+    calProvider.importFromGoogle(_projectId!, start, end);
+  }
+
+  void _exportToGoogle(CalendarProvider calProvider) {
+    calProvider.exportToGoogle(_projectId!);
   }
 
   Color _getJobTypeColor(String type) {

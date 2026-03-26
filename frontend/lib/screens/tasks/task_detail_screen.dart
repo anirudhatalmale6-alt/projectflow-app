@@ -11,6 +11,7 @@ import '../../providers/task_provider.dart';
 import '../../providers/delivery_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/comment_service.dart';
+import '../../providers/calendar_provider.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/priority_badge.dart';
 import '../../widgets/hours_tracker.dart';
@@ -34,6 +35,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   bool _sendingComment = false;
   bool _uploading = false;
   double _uploadProgress = 0.0;
+  bool _creatingEvent = false;
   String? _taskId;
 
   @override
@@ -169,6 +171,47 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       });
     } catch (_) {}
     setState(() => _sendingComment = false);
+  }
+
+  Future<void> _addToCalendar() async {
+    final task = context.read<TaskProvider>().currentTask;
+    if (task == null) return;
+
+    final dueDate = task.dueDate ?? DateTime.now().add(const Duration(days: 1));
+    final startDate = dueDate;
+    final endDate = dueDate.add(const Duration(hours: 1));
+
+    setState(() => _creatingEvent = true);
+    try {
+      final calendarProvider = context.read<CalendarProvider>();
+      final event = await calendarProvider.createEvent(task.projectId, {
+        'title': task.title,
+        'description': task.description ?? '',
+        'start_date': startDate.toIso8601String(),
+        'end_date': endDate.toIso8601String(),
+        'event_type': 'deadline',
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(event != null
+                ? 'Evento criado no calendario!'
+                : 'Erro ao criar evento: ${calendarProvider.errorMessage}'),
+            backgroundColor: event != null ? AppTheme.successColor : AppTheme.errorColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao criar evento: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+    setState(() => _creatingEvent = false);
   }
 
   void _changeStatus(String newStatus) {
@@ -734,6 +777,40 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           task.dueDate != null
                               ? DateFormat('dd/MM/yyyy').format(task.dueDate!)
                               : 'Sem prazo',
+                        ),
+                        const Divider(height: 20),
+                        InkWell(
+                          onTap: _creatingEvent ? null : _addToCalendar,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.event_available,
+                                  size: 18,
+                                  color: _creatingEvent ? AppTheme.textTertiary : AppTheme.primaryColor,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _creatingEvent ? 'Criando evento...' : 'Adicionar ao Calendario',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: _creatingEvent ? AppTheme.textTertiary : AppTheme.primaryColor,
+                                  ),
+                                ),
+                                if (_creatingEvent) ...[
+                                  const SizedBox(width: 8),
+                                  const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
                         if (task.tags.isNotEmpty) ...[
                           const Divider(height: 20),

@@ -52,6 +52,13 @@ class Project {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  static int _safeInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    return int.tryParse(v.toString()) ?? 0;
+  }
+
   Project({
     required this.id,
     required this.name,
@@ -89,8 +96,11 @@ class Project {
           : [],
       taskStats: json['task_stats'] != null
           ? TaskStats.fromJson(json['task_stats'])
-          : TaskStats(),
-      deliveryCount: json['delivery_count'] ?? 0,
+          : TaskStats(
+              total: _safeInt(json['task_count']),
+              done: _safeInt(json['done_count']),
+            ),
+      deliveryCount: _safeInt(json['delivery_count']),
       color: json['color'],
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])

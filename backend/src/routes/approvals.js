@@ -14,16 +14,11 @@ router.use(auth);
 
 /**
  * Helper: check if user can approve/reject a delivery.
- * Admin, manager (global or project), and client (linked to project) can review.
  */
 async function canReviewDelivery(user, delivery) {
   if (user.role === 'admin' || user.role === 'manager') return true;
-
-  // Project managers
   const membership = await Project.isMember(delivery.project_id, user.id);
   if (membership && membership.role === 'manager') return true;
-
-  // Clients linked to the project
   if (user.role === 'client') {
     const { rows } = await pool.query(
       `SELECT 1 FROM projects p
@@ -34,8 +29,74 @@ async function canReviewDelivery(user, delivery) {
     );
     return rows.length > 0;
   }
-
   return false;
+}
+
+/**
+ * Get all user IDs who should be notified about a delivery event.
+ * Includes: uploader, task assignees, task reporter, project managers/admins.
+ */
+async function getDeliveryNotifyIds(delivery, excludeUserId) {
+  const ids = new Set();
+
+  // Uploader
+  if (delivery.uploaded_by && delivery.uploaded_by !== excludeUserId) {
+    ids.add(delivery.uploaded_by);
+  }
+
+  // Task assignees and reporter (if delivery is linked to a task)
+  if (delivery.task_id) {
+    try {
+      const { rows: taskRows } = await pool.query(
+        'SELECT assignee_id, reporter_id FROM tasks WHERE id = $1',
+        [delivery.task_id]
+      );
+      if (taskRows.length > 0) {
+        if (taskRows[0].assignee_id) ids.add(taskRows[0].assignee_id);
+        if (taskRows[0].reporter_id) ids.add(taskRows[0].reporter_id);
+      }
+      // Multiple assignees
+      const { rows: assignees } = await pool.query(
+        'SELECT user_id FROM task_assignees WHERE task_id = $1',
+        [delivery.task_id]
+      );
+      for (const a of assignees) ids.add(a.user_id);
+    } catch (_) {}
+  }
+
+  // Project managers and admins
+  try {
+    const { rows: members } = await pool.query(
+      `SELECT DISTINCT pm.user_id FROM project_members pm
+       JOIN users u ON pm.user_id = u.id
+       WHERE pm.project_id = $1
+         AND (pm.role IN ('manager', 'admin') OR u.role IN ('manager', 'admin'))`,
+      [delivery.project_id]
+    );
+    for (const m of members) ids.add(m.user_id);
+  } catch (_) {}
+
+  // Remove the actor
+  ids.delete(excludeUserId);
+  return [...ids];
+}
+
+/**
+ * Send notifications to multiple users with Socket.IO emit.
+ */
+async function notifyUsers(userIds, notifData, io) {
+  if (userIds.length === 0) return;
+  const notifications = userIds.map(uid => ({ userId: uid, ...notifData }));
+  await Notification.createBulk(notifications);
+  if (io) {
+    for (const uid of userIds) {
+      io.to(`user:${uid}`).emit('notification', {
+        type: notifData.type,
+        status: notifData.status || undefined,
+        delivery_id: notifData.referenceId,
+      });
+    }
+  }
 }
 
 // POST /api/v1/deliveries/:deliveryId/approve
@@ -53,7 +114,6 @@ router.post('/deliveries/:deliveryId/approve', async (req, res, next) => {
 
     const { comments } = req.body;
 
-    // Create approval record
     const approval = await Approval.create({
       deliveryId: delivery.id,
       status: 'approved',
@@ -61,33 +121,23 @@ router.post('/deliveries/:deliveryId/approve', async (req, res, next) => {
       comments: comments || null,
     });
 
-    // Update delivery status
     await DeliveryJob.update(delivery.id, {
       status: 'approved',
       reviewedBy: req.user.id,
       reviewNotes: comments || null,
     });
 
-    // Notify the uploader
-    if (delivery.uploaded_by && delivery.uploaded_by !== req.user.id) {
-      await Notification.create({
-        userId: delivery.uploaded_by,
-        type: 'approval_result',
-        title: `Delivery approved: "${delivery.title}" v${delivery.version}`,
-        message: `${req.user.name} approved your delivery.${comments ? ` Comments: ${comments}` : ''}`,
-        referenceId: delivery.id,
-        referenceType: 'delivery',
-      });
-
-      const io = req.app.get('io');
-      if (io) {
-        io.to(`user:${delivery.uploaded_by}`).emit('notification', {
-          type: 'approval_result',
-          status: 'approved',
-          delivery_id: delivery.id,
-        });
-      }
-    }
+    // Notify all relevant people
+    const notifyIds = await getDeliveryNotifyIds(delivery, req.user.id);
+    const io = req.app.get('io');
+    await notifyUsers(notifyIds, {
+      type: 'approval_result',
+      status: 'approved',
+      title: `Entrega aprovada: "${delivery.title}" v${delivery.version}`,
+      message: `${req.user.name} aprovou a entrega.${comments ? ` Comentário: ${comments}` : ''}`,
+      referenceId: delivery.id,
+      referenceType: 'delivery',
+    }, io);
 
     await logAudit({
       userId: req.user.id,
@@ -98,17 +148,12 @@ router.post('/deliveries/:deliveryId/approve', async (req, res, next) => {
       ipAddress: getClientIp(req),
     });
 
-    const io = req.app.get('io');
     if (io) {
       io.to(`project:${delivery.project_id}`).emit('approval_submitted', {
-        delivery_id: delivery.id,
-        status: 'approved',
-        reviewer: req.user.name,
+        delivery_id: delivery.id, status: 'approved', reviewer: req.user.name,
       });
       io.to(`project:${delivery.project_id}`).emit('delivery_status_changed', {
-        id: delivery.id,
-        status: 'approved',
-        project_id: delivery.project_id,
+        id: delivery.id, status: 'approved', project_id: delivery.project_id,
       });
     }
 
@@ -132,7 +177,6 @@ router.post('/deliveries/:deliveryId/reject', async (req, res, next) => {
     }
 
     const { comments } = req.body;
-
     if (!comments || typeof comments !== 'string' || comments.trim().length === 0) {
       return res.status(400).json({ error: 'Comments are required when rejecting a delivery.' });
     }
@@ -150,26 +194,17 @@ router.post('/deliveries/:deliveryId/reject', async (req, res, next) => {
       reviewNotes: comments.trim(),
     });
 
-    // Notify the uploader
-    if (delivery.uploaded_by && delivery.uploaded_by !== req.user.id) {
-      await Notification.create({
-        userId: delivery.uploaded_by,
-        type: 'approval_result',
-        title: `Delivery rejected: "${delivery.title}" v${delivery.version}`,
-        message: `${req.user.name} rejected your delivery. Reason: ${comments}`,
-        referenceId: delivery.id,
-        referenceType: 'delivery',
-      });
-
-      const io = req.app.get('io');
-      if (io) {
-        io.to(`user:${delivery.uploaded_by}`).emit('notification', {
-          type: 'approval_result',
-          status: 'rejected',
-          delivery_id: delivery.id,
-        });
-      }
-    }
+    // Notify all relevant people
+    const notifyIds = await getDeliveryNotifyIds(delivery, req.user.id);
+    const io = req.app.get('io');
+    await notifyUsers(notifyIds, {
+      type: 'approval_result',
+      status: 'rejected',
+      title: `Entrega rejeitada: "${delivery.title}" v${delivery.version}`,
+      message: `${req.user.name} rejeitou a entrega. Motivo: ${comments}`,
+      referenceId: delivery.id,
+      referenceType: 'delivery',
+    }, io);
 
     await logAudit({
       userId: req.user.id,
@@ -180,17 +215,12 @@ router.post('/deliveries/:deliveryId/reject', async (req, res, next) => {
       ipAddress: getClientIp(req),
     });
 
-    const io = req.app.get('io');
     if (io) {
       io.to(`project:${delivery.project_id}`).emit('approval_submitted', {
-        delivery_id: delivery.id,
-        status: 'rejected',
-        reviewer: req.user.name,
+        delivery_id: delivery.id, status: 'rejected', reviewer: req.user.name,
       });
       io.to(`project:${delivery.project_id}`).emit('delivery_status_changed', {
-        id: delivery.id,
-        status: 'rejected',
-        project_id: delivery.project_id,
+        id: delivery.id, status: 'rejected', project_id: delivery.project_id,
       });
     }
 
@@ -214,7 +244,6 @@ router.post('/deliveries/:deliveryId/request-revision', async (req, res, next) =
     }
 
     const { comments } = req.body;
-
     if (!comments || typeof comments !== 'string' || comments.trim().length === 0) {
       return res.status(400).json({ error: 'Comments are required when requesting a revision.' });
     }
@@ -232,26 +261,17 @@ router.post('/deliveries/:deliveryId/request-revision', async (req, res, next) =
       reviewNotes: comments.trim(),
     });
 
-    // Notify the uploader
-    if (delivery.uploaded_by && delivery.uploaded_by !== req.user.id) {
-      await Notification.create({
-        userId: delivery.uploaded_by,
-        type: 'approval_result',
-        title: `Revision requested: "${delivery.title}" v${delivery.version}`,
-        message: `${req.user.name} requested a revision. Notes: ${comments}`,
-        referenceId: delivery.id,
-        referenceType: 'delivery',
-      });
-
-      const io = req.app.get('io');
-      if (io) {
-        io.to(`user:${delivery.uploaded_by}`).emit('notification', {
-          type: 'approval_result',
-          status: 'revision_requested',
-          delivery_id: delivery.id,
-        });
-      }
-    }
+    // Notify all relevant people
+    const notifyIds = await getDeliveryNotifyIds(delivery, req.user.id);
+    const io = req.app.get('io');
+    await notifyUsers(notifyIds, {
+      type: 'approval_result',
+      status: 'revision_requested',
+      title: `Revisão solicitada: "${delivery.title}" v${delivery.version}`,
+      message: `${req.user.name} solicitou uma revisão. Notas: ${comments}`,
+      referenceId: delivery.id,
+      referenceType: 'delivery',
+    }, io);
 
     await logAudit({
       userId: req.user.id,
@@ -262,17 +282,12 @@ router.post('/deliveries/:deliveryId/request-revision', async (req, res, next) =
       ipAddress: getClientIp(req),
     });
 
-    const io = req.app.get('io');
     if (io) {
       io.to(`project:${delivery.project_id}`).emit('approval_submitted', {
-        delivery_id: delivery.id,
-        status: 'revision_requested',
-        reviewer: req.user.name,
+        delivery_id: delivery.id, status: 'revision_requested', reviewer: req.user.name,
       });
       io.to(`project:${delivery.project_id}`).emit('delivery_status_changed', {
-        id: delivery.id,
-        status: 'revision_requested',
-        project_id: delivery.project_id,
+        id: delivery.id, status: 'revision_requested', project_id: delivery.project_id,
       });
     }
 
@@ -290,11 +305,9 @@ router.get('/deliveries/:deliveryId/approvals', async (req, res, next) => {
       return res.status(404).json({ error: 'Delivery not found.' });
     }
 
-    // Check project access
     if (req.user.role !== 'admin' && req.user.role !== 'manager') {
       const membership = await Project.isMember(delivery.project_id, req.user.id);
       if (!membership) {
-        // Check client access
         if (req.user.role === 'client') {
           const { rows } = await pool.query(
             `SELECT 1 FROM projects p
@@ -313,7 +326,6 @@ router.get('/deliveries/:deliveryId/approvals', async (req, res, next) => {
     }
 
     const approvals = await Approval.findByDeliveryId(req.params.deliveryId);
-
     res.json({ approvals });
   } catch (err) {
     next(err);

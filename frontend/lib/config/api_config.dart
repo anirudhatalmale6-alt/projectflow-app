@@ -115,6 +115,11 @@ class ApiConfig {
       '$apiPrefix/projects/$projectId/calendar/events';
   static String calendarEventById(String id) =>
       '$apiPrefix/calendar/events/$id';
+  static const String googleCalendarStatus = '$apiPrefix/calendar/google/status';
+  static String googleCalendarImport(String projectId) =>
+      '$apiPrefix/projects/$projectId/calendar/sync/import';
+  static String googleCalendarExport(String projectId) =>
+      '$apiPrefix/projects/$projectId/calendar/sync/export';
 
   // Google Drive
   static String driveStatus(String projectId) =>

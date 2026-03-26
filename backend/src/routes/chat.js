@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/database');
 const auth = require('../middleware/auth');
+const Notification = require('../models/Notification');
 
 const router = express.Router();
 
@@ -97,16 +98,51 @@ router.post('/channels/:id/messages', auth, async (req, res, next) => {
     message.user_name = req.user.name;
     message.user_avatar = req.user.avatar_url;
 
-    // Emit via Socket.IO
+    // Emit via Socket.IO and notify project members
     const io = req.app.get('io');
-    if (io) {
-      // Get channel to find project
-      const channelRes = await pool.query('SELECT project_id FROM chat_channels WHERE id = $1', [req.params.id]);
-      if (channelRes.rows.length > 0) {
-        io.to(`project:${channelRes.rows[0].project_id}`).emit('chat_message', {
-          channel_id: req.params.id,
-          message,
-        });
+    const channelRes = await pool.query('SELECT project_id FROM chat_channels WHERE id = $1', [req.params.id]);
+    const projectId = channelRes.rows.length > 0 ? channelRes.rows[0].project_id : null;
+
+    if (io && projectId) {
+      io.to(`project:${projectId}`).emit('chat_message', {
+        channel_id: req.params.id,
+        message,
+      });
+
+      // Notify all project members (except the sender)
+      try {
+        const { rows: members } = await pool.query(
+          `SELECT DISTINCT user_id FROM project_members WHERE project_id = $1 AND user_id != $2
+           UNION
+           SELECT DISTINCT id as user_id FROM users WHERE role = 'admin' AND id != $2`,
+          [projectId, req.user.id]
+        );
+
+        const { rows: projectRows } = await pool.query('SELECT name FROM projects WHERE id = $1', [projectId]);
+        const projectName = projectRows.length > 0 ? projectRows[0].name : 'Projeto';
+
+        const preview = content.length > 60 ? content.substring(0, 60) + '...' : content;
+        const notifications = members.map(m => ({
+          userId: m.user_id,
+          type: 'chat_message',
+          title: `Nova mensagem de ${req.user.name}`,
+          message: `${preview} — no projeto "${projectName}"`,
+          referenceId: projectId,
+          referenceType: 'project',
+        }));
+
+        if (notifications.length > 0) {
+          await Notification.createBulk(notifications);
+          for (const m of members) {
+            io.to(`user:${m.user_id}`).emit('notification', {
+              type: 'chat_message',
+              title: `Nova mensagem de ${req.user.name}`,
+              project_id: projectId,
+            });
+          }
+        }
+      } catch (notifErr) {
+        console.error('Failed to send chat notifications:', notifErr.message);
       }
     }
 

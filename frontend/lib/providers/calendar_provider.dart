@@ -8,11 +8,17 @@ class CalendarProvider with ChangeNotifier {
 
   List<CalendarEvent> _events = [];
   bool _isLoading = false;
+  bool _isSyncing = false;
+  bool _googleLinked = false;
   String? _errorMessage;
+  String? _syncMessage;
 
   List<CalendarEvent> get events => _events;
   bool get isLoading => _isLoading;
+  bool get isSyncing => _isSyncing;
+  bool get googleLinked => _googleLinked;
   String? get errorMessage => _errorMessage;
+  String? get syncMessage => _syncMessage;
 
   List<CalendarEvent> eventsForDay(DateTime day) {
     return _events.where((e) {
@@ -81,6 +87,70 @@ class CalendarProvider with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  // Google Calendar Sync
+
+  Future<void> checkGoogleStatus() async {
+    try {
+      final status = await _service.getGoogleCalendarStatus();
+      _googleLinked = status['linked'] == true;
+      notifyListeners();
+    } catch (_) {
+      _googleLinked = false;
+    }
+  }
+
+  Future<bool> importFromGoogle(String projectId, DateTime start, DateTime end) async {
+    _isSyncing = true;
+    _syncMessage = null;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final result = await _service.importFromGoogle(
+        projectId,
+        start.toIso8601String(),
+        end.toIso8601String(),
+      );
+      final imported = result['imported'] ?? 0;
+      final total = result['total_google_events'] ?? 0;
+      _syncMessage = '$imported eventos importados de $total do Google Calendar.';
+
+      // Reload events
+      await loadEvents(projectId, start: start, end: end);
+    } catch (e) {
+      _errorMessage = _parseError(e);
+    }
+
+    _isSyncing = false;
+    notifyListeners();
+    return _errorMessage == null;
+  }
+
+  Future<bool> exportToGoogle(String projectId) async {
+    _isSyncing = true;
+    _syncMessage = null;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final result = await _service.exportToGoogle(projectId);
+      final exported = result['exported'] ?? 0;
+      final total = result['total_local_events'] ?? 0;
+      _syncMessage = '$exported de $total eventos exportados para o Google Calendar.';
+    } catch (e) {
+      _errorMessage = _parseError(e);
+    }
+
+    _isSyncing = false;
+    notifyListeners();
+    return _errorMessage == null;
+  }
+
+  void clearSyncMessage() {
+    _syncMessage = null;
+    notifyListeners();
   }
 
   String _parseError(dynamic error) {

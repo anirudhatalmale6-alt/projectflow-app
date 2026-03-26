@@ -44,7 +44,7 @@ const DeliveryJob = {
       FROM delivery_jobs dj
       LEFT JOIN users u_up ON dj.uploaded_by = u_up.id
       LEFT JOIN users u_rev ON dj.reviewed_by = u_rev.id
-      WHERE dj.project_id = $1 AND dj.requires_approval = true AND dj.deleted_at IS NULL
+      WHERE dj.project_id = $1 AND dj.deleted_at IS NULL
     `;
     const values = [projectId];
     let paramIndex = 2;

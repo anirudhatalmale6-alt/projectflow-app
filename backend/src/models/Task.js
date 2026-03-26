@@ -127,7 +127,7 @@ const Task = {
       paramIndex++;
     }
 
-    query += ' ORDER BY t.status, t.position ASC, t.created_at DESC';
+    query += ' ORDER BY t.created_at DESC';
 
     const { rows } = await pool.query(query, values);
     parseTags(rows);
@@ -295,7 +295,7 @@ const Task = {
       SELECT t.*, p.name AS project_name, p.status AS project_status
       FROM tasks t
       JOIN projects p ON t.project_id = p.id
-      WHERE t.assignee_id = $1 AND t.deleted_at IS NULL
+      WHERE t.assignee_id = $1 AND t.deleted_at IS NULL AND p.deleted_at IS NULL
     `;
     const values = [userId];
 
@@ -304,21 +304,28 @@ const Task = {
       values.push(status);
     }
 
-    query += ' ORDER BY CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END, t.due_date ASC, t.priority DESC, t.created_at DESC';
+    query += ' ORDER BY t.created_at DESC';
 
     const { rows } = await pool.query(query, values);
     return rows;
   },
 
-  async findAll({ status, priority } = {}) {
+  async findAll({ status, priority, userId, userRole } = {}) {
     let query = `
       SELECT t.*, p.name AS project_name, p.status AS project_status
       FROM tasks t
       JOIN projects p ON t.project_id = p.id
-      WHERE t.deleted_at IS NULL
+      WHERE t.deleted_at IS NULL AND p.deleted_at IS NULL
     `;
     const values = [];
     let paramIdx = 1;
+
+    // Manager: only tasks from projects they are members of or assigned to
+    if (userId && userRole === 'manager') {
+      query += ` AND (p.id IN (SELECT project_id FROM project_members WHERE user_id = $${paramIdx}) OR t.assignee_id = $${paramIdx})`;
+      values.push(userId);
+      paramIdx++;
+    }
 
     if (status) {
       query += ` AND t.status = $${paramIdx++}`;
@@ -329,7 +336,7 @@ const Task = {
       values.push(priority);
     }
 
-    query += ' ORDER BY CASE WHEN t.due_date IS NULL THEN 1 ELSE 0 END, t.due_date ASC, t.priority DESC, t.created_at DESC';
+    query += ' ORDER BY t.created_at DESC';
 
     const { rows } = await pool.query(query, values);
     return rows;

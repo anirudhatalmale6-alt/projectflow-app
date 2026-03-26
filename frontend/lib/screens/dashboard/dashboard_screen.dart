@@ -263,7 +263,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                         Expanded(
                           child: _buildStatCard(
                             'Tarefas Pendentes',
-                            '${tasks.todoTasks.length}',
+                            '${tasks.todoTasks.length + tasks.inProgressTasks.length}',
                             Icons.pending_actions,
                             AppTheme.statusPending,
                           ),
@@ -632,14 +632,35 @@ class DashboardScreenState extends State<DashboardScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    AppTheme.getTaskStatusLabel(task.status),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: color,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: 'Poppins',
-                    ),
+                  Row(
+                    children: [
+                      if (task.projectName != null && task.projectName!.isNotEmpty) ...[
+                        Icon(Icons.folder_outlined, size: 12, color: AppTheme.textTertiary),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            task.projectName!,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textTertiary,
+                              fontFamily: 'Poppins',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        AppTheme.getTaskStatusLabel(task.status),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: color,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

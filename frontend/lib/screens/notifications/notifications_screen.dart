@@ -58,7 +58,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             TextButton.icon(
               onPressed: () => provider.markAllAsRead(),
               icon: const Icon(Icons.done_all, size: 18),
-              label: const Text('Marcar todas'),
+              label: const Text('Marcar lidas'),
+            ),
+          if (provider.notifications.isNotEmpty)
+            TextButton.icon(
+              onPressed: () => provider.clearAll(),
+              icon: const Icon(Icons.delete_sweep, size: 18),
+              label: const Text('Limpar'),
             ),
         ],
       ),

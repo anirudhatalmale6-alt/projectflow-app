@@ -59,7 +59,7 @@ class DeliveryJob {
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'])
           : null,
-      requiresApproval: json['requires_approval'] == true,
+      requiresApproval: json['requires_approval'] == true || json['requires_approval'] == 1,
     );
   }
 

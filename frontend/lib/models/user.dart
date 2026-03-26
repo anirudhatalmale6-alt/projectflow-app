@@ -25,7 +25,7 @@ class User {
       avatarUrl: json['avatar_url'],
       role: json['role'] ?? 'editor',
       phone: json['phone'],
-      isApproved: json['is_approved'] ?? true,
+      isApproved: json['is_approved'] == true || json['is_approved'] == 1,
     );
   }
 

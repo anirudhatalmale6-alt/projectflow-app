@@ -51,9 +51,9 @@ const Project = {
         c.name AS client_name, c.company AS client_company,
         u.name AS created_by_name,
         (SELECT COUNT(*)::int FROM project_members WHERE project_id = p.id) AS member_count,
-        (SELECT COUNT(*)::int FROM tasks WHERE project_id = p.id) AS task_count,
-        (SELECT COUNT(*)::int FROM tasks WHERE project_id = p.id AND status = 'done') AS done_count,
-        (SELECT COUNT(*)::int FROM delivery_jobs WHERE project_id = p.id) AS delivery_count
+        (SELECT COUNT(*)::int FROM tasks WHERE project_id = p.id AND deleted_at IS NULL) AS task_count,
+        (SELECT COUNT(*)::int FROM tasks WHERE project_id = p.id AND status = 'done' AND deleted_at IS NULL) AS done_count,
+        (SELECT COUNT(*)::int FROM delivery_jobs WHERE project_id = p.id AND deleted_at IS NULL) AS delivery_count
       FROM projects p
       LEFT JOIN clients c ON p.client_id = c.id
       JOIN users u ON p.created_by = u.id
@@ -65,16 +65,16 @@ const Project = {
 
     // Role-based project visibility:
     // - Admin: sees all projects
-    // - Manager: sees all projects (like admin)
-    // - Editor/Freelancer: sees projects where they are members or have assigned tasks
+    // - Manager/Editor: sees projects where they are members or have assigned tasks
+    // - Freelancer: sees projects where they are members
     // - Client: sees projects linked to their client record
-    if (userId && userRole !== 'admin' && userRole !== 'manager') {
+    if (userId && userRole !== 'admin') {
       if (userRole === 'client') {
         conditions.push(`p.client_id IN (SELECT id FROM clients WHERE email = (SELECT email FROM users WHERE id = $${paramIndex}))`);
         values.push(userId);
         paramIndex++;
-      } else if (userRole === 'editor') {
-        // Editors see projects they are members of OR have tasks assigned to them
+      } else if (userRole === 'manager' || userRole === 'editor') {
+        // Managers and editors see projects they are members of OR have tasks assigned to them
         conditions.push(`(p.id IN (SELECT project_id FROM project_members WHERE user_id = $${paramIndex}) OR p.id IN (SELECT project_id FROM tasks WHERE assignee_id = $${paramIndex} AND deleted_at IS NULL))`);
         values.push(userId);
         paramIndex++;

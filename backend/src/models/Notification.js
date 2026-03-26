@@ -75,6 +75,22 @@ const Notification = {
     );
     return rows[0].count;
   },
+
+  async deleteAll(userId) {
+    const { rowCount } = await pool.query(
+      'DELETE FROM notifications WHERE user_id = $1',
+      [userId]
+    );
+    return rowCount;
+  },
+
+  async deleteRead(userId) {
+    const { rowCount } = await pool.query(
+      'DELETE FROM notifications WHERE user_id = $1 AND is_read = TRUE',
+      [userId]
+    );
+    return rowCount;
+  },
 };
 
 module.exports = Notification;

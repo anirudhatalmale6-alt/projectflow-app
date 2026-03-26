@@ -27,7 +27,7 @@ class AppNotification {
       message: json['message'] ?? '',
       referenceType: json['reference_type'],
       referenceId: json['reference_id']?.toString(),
-      isRead: json['is_read'] ?? false,
+      isRead: json['is_read'] == true || json['is_read'] == 1,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
           : null,

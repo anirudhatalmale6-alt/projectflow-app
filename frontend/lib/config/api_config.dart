@@ -18,11 +18,15 @@ class ApiConfig {
   static const String apiPrefix = '/api/v1';
 
   static String get wsUrl {
+    // Socket.IO client internally converts https→wss for WebSocket transport.
+    // Dart's Uri treats wss:// as unknown scheme → port defaults to 0.
+    // Fix: always include explicit port so the library never infers port 0.
     if (kIsWeb) {
-      final origin = Uri.base.origin;
-      return origin.replaceFirst('https://', 'wss://').replaceFirst('http://', 'ws://');
+      final uri = Uri.base;
+      final port = uri.port != 0 ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+      return '${uri.scheme}://${uri.host}:$port';
     }
-    return _serverUrl.replaceFirst('https://', 'wss://');
+    return 'https://duozzflow.com:443';
   }
 
   // Auth

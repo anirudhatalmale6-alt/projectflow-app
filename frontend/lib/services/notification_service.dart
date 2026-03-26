@@ -38,4 +38,8 @@ class NotificationService {
     );
     return data['count'] ?? 0;
   }
+
+  Future<void> clearAll() async {
+    await _api.delete(ApiConfig.notifications);
+  }
 }

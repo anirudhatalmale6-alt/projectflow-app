@@ -497,11 +497,15 @@ router.delete('/tasks/:id', async (req, res, next) => {
 router.get('/tasks', async (req, res, next) => {
   try {
     const { status, priority, search } = req.query;
-    // Admin/manager see all tasks; others see only their assigned tasks
-    const isAdminOrManager = req.user.role === 'admin' || req.user.role === 'manager';
-    const tasks = isAdminOrManager
-      ? await Task.findAll({ status, priority })
-      : await Task.findByAssignee(req.user.id, { status, priority });
+    // Admin sees all tasks; manager sees tasks from their projects; others see assigned tasks
+    let tasks;
+    if (req.user.role === 'admin') {
+      tasks = await Task.findAll({ status, priority });
+    } else if (req.user.role === 'manager') {
+      tasks = await Task.findAll({ status, priority, userId: req.user.id, userRole: 'manager' });
+    } else {
+      tasks = await Task.findByAssignee(req.user.id, { status, priority });
+    }
 
     // Enrich with assignees
     await Task.enrichWithAssignees(tasks);

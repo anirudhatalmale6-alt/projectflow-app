@@ -118,8 +118,10 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             TextField(
               controller: _reviewNotesController,
               maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Comentarios (opcional)',
+              decoration: InputDecoration(
+                labelText: (action == 'reject' || action == 'revision')
+                    ? 'Comentarios (obrigatorio)'
+                    : 'Comentarios (opcional)',
                 hintText: 'Adicione um comentario...',
               ),
             ),
@@ -135,10 +137,16 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final text = _reviewNotesController.text.trim();
+              // Reject and revision require comments
+              if ((action == 'reject' || action == 'revision') && text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Comentario obrigatorio para esta acao.')),
+                );
+                return;
+              }
               Navigator.pop(ctx);
-              final comments = _reviewNotesController.text.trim().isNotEmpty
-                  ? _reviewNotesController.text.trim()
-                  : null;
+              final comments = text.isNotEmpty ? text : null;
 
               switch (action) {
                 case 'approve':
@@ -361,8 +369,8 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (auth.canApproveDeliveries) ...[
-                    // Clickable status options for admin/manager
+                  if (auth.canApproveDeliveries && delivery.requiresApproval) ...[
+                    // Clickable status options for admin/manager (only when approval required)
                     _buildStatusOption(
                       'approved',
                       'Aprovado',

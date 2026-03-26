@@ -25,7 +25,30 @@ class ProjectService {
 
   Future<Project> getProject(String id) async {
     final data = await _api.get(ApiConfig.projectById(id));
-    return Project.fromJson(data['project'] ?? data);
+    final projectJson = Map<String, dynamic>.from(data['project'] ?? data);
+
+    // Merge stats into project JSON so Project.fromJson can parse them
+    if (data['stats'] != null) {
+      final stats = data['stats'];
+      if (stats['tasks'] != null) {
+        final t = stats['tasks'];
+        projectJson['task_stats'] = {
+          'total': t['total_tasks'] ?? 0,
+          'todo': t['todo'] ?? 0,
+          'in_progress': t['in_progress'] ?? 0,
+          'review': t['review'] ?? 0,
+          'done': t['done'] ?? 0,
+        };
+      }
+      if (stats['deliveries'] != null) {
+        projectJson['delivery_count'] = stats['deliveries']['total_deliveries'] ?? 0;
+      }
+    }
+    if (data['members'] != null) {
+      projectJson['members'] = data['members'];
+    }
+
+    return Project.fromJson(projectJson);
   }
 
   Future<Project> createProject(Map<String, dynamic> projectData) async {

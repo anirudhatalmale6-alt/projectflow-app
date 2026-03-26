@@ -1,6 +1,6 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
-export "FLUTTER_ROOT=/tmp/flutter_f2"
+export "FLUTTER_ROOT=/tmp/flutter-sdk"
 export "FLUTTER_APPLICATION_PATH=/var/lib/freelancer/projects/40262858/frontend"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
 export "FLUTTER_TARGET=lib/main.dart"

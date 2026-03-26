@@ -304,9 +304,12 @@ router.get('/audit-log', async (req, res, next) => {
     }
 
     // Count total
-    const countQuery = query.replace(/SELECT al\.\*, u\.name .* FROM/, 'SELECT COUNT(*)::int AS count FROM');
-    const { rows: countRows } = await pool.query(countQuery, values);
-    const total = countRows[0].count;
+    let countBase = 'SELECT COUNT(*) AS count FROM audit_log al LEFT JOIN users u ON al.user_id = u.id';
+    if (conditions.length > 0) {
+      countBase += ' WHERE ' + conditions.join(' AND ');
+    }
+    const { rows: countRows } = await pool.query(countBase, values);
+    const total = parseInt(countRows[0].count, 10) || 0;
 
     query += ` ORDER BY al.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     values.push(

@@ -33,6 +33,7 @@ class TaskAssignee {
 class Task {
   final String id;
   final String projectId;
+  final String? projectName;
   final String title;
   final String? description;
   final String status;
@@ -52,6 +53,7 @@ class Task {
   Task({
     required this.id,
     required this.projectId,
+    this.projectName,
     required this.title,
     this.description,
     this.status = 'todo',
@@ -73,6 +75,7 @@ class Task {
     return Task(
       id: json['id']?.toString() ?? '',
       projectId: json['project_id']?.toString() ?? '',
+      projectName: json['project_name'],
       title: json['title'] ?? '',
       description: json['description'],
       status: json['status'] ?? 'todo',
@@ -134,6 +137,7 @@ class Task {
   Task copyWith({
     String? id,
     String? projectId,
+    String? projectName,
     String? title,
     String? description,
     String? status,
@@ -152,6 +156,7 @@ class Task {
     return Task(
       id: id ?? this.id,
       projectId: projectId ?? this.projectId,
+      projectName: projectName ?? this.projectName,
       title: title ?? this.title,
       description: description ?? this.description,
       status: status ?? this.status,

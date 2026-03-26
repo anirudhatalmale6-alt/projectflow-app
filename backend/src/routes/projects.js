@@ -187,12 +187,24 @@ router.delete('/:id', auth, async (req, res, next) => {
       return res.status(404).json({ error: 'Project not found.' });
     }
 
-    // Only author can delete
-    if (project.created_by !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only the project author can delete this project.' });
+    // Author, admin, or manager can delete
+    if (project.created_by !== req.user.id && req.user.role !== 'admin' && req.user.role !== 'manager') {
+      return res.status(403).json({ error: 'Only the project author, admin or manager can delete this project.' });
     }
 
     const deleted = await Project.softDelete(req.params.id, req.user.id);
+
+    // Cascade: soft-delete all tasks belonging to this project
+    await pool.query(
+      'UPDATE tasks SET deleted_at = NOW(), deleted_by = $1 WHERE project_id = $2 AND deleted_at IS NULL',
+      [req.user.id, req.params.id]
+    );
+
+    // Cascade: soft-delete all deliveries belonging to this project
+    await pool.query(
+      'UPDATE delivery_jobs SET deleted_at = NOW(), deleted_by = $1 WHERE project_id = $2 AND deleted_at IS NULL',
+      [req.user.id, req.params.id]
+    );
 
     await logAudit({
       userId: req.user.id,

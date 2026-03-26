@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../models/notification.dart';
 import '../services/notification_service.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../utils/notification_sound_stub.dart'
+    if (dart.library.html) '../utils/notification_sound_web.dart';
 
 class NotificationProvider with ChangeNotifier {
   final NotificationService _notificationService = NotificationService();
@@ -101,9 +104,27 @@ class NotificationProvider with ChangeNotifier {
     }
   }
 
+  Future<void> clearAll() async {
+    try {
+      await _notificationService.clearAll();
+      _notifications.clear();
+      _unreadCount = 0;
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = _parseError(e);
+      notifyListeners();
+    }
+  }
+
   void addNotification(AppNotification notification) {
     _notifications.insert(0, notification);
-    if (!notification.isRead) _unreadCount++;
+    if (!notification.isRead) {
+      _unreadCount++;
+      // Play sound for new unread notifications
+      try {
+        playNotificationSound();
+      } catch (_) {}
+    }
     notifyListeners();
   }
 

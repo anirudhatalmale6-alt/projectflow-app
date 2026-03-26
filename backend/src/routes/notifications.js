@@ -50,4 +50,24 @@ router.put('/read-all', async (req, res, next) => {
   }
 });
 
+// DELETE /api/v1/notifications - clear all notifications
+router.delete('/', async (req, res, next) => {
+  try {
+    const count = await Notification.deleteAll(req.user.id);
+    res.json({ message: `Deleted ${count} notifications.`, count });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/v1/notifications/read - clear read notifications
+router.delete('/read', async (req, res, next) => {
+  try {
+    const count = await Notification.deleteRead(req.user.id);
+    res.json({ message: `Deleted ${count} read notifications.`, count });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

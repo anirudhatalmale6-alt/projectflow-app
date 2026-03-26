@@ -25,6 +25,15 @@ class NotificationProvider with ChangeNotifier {
   List<AppNotification> get unreadNotifications =>
       _notifications.where((n) => !n.isRead).toList();
 
+  /// Initialize push notifications for background delivery
+  void enablePushNotifications(String authToken) {
+    if (kIsWeb) {
+      try {
+        initPushNotifications(authToken);
+      } catch (_) {}
+    }
+  }
+
   /// Start listening for real-time notification events via socket
   void startListening() {
     if (_socketListening) return;

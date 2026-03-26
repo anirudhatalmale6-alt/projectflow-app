@@ -15,13 +15,20 @@ class TaskStats {
     this.done = 0,
   });
 
+  static int _p(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    return int.tryParse(v.toString()) ?? 0;
+  }
+
   factory TaskStats.fromJson(Map<String, dynamic> json) {
     return TaskStats(
-      total: json['total'] ?? 0,
-      todo: json['todo'] ?? 0,
-      inProgress: json['in_progress'] ?? 0,
-      review: json['review'] ?? 0,
-      done: json['done'] ?? 0,
+      total: _p(json['total']),
+      todo: _p(json['todo']),
+      inProgress: _p(json['in_progress']),
+      review: _p(json['review']),
+      done: _p(json['done']),
     );
   }
 

@@ -1,4 +1,6 @@
 const pool = require('../config/database');
+let PushService;
+try { PushService = require('../services/pushService'); } catch (e) { PushService = null; }
 
 const Notification = {
   async create({ userId, type, title, message, referenceId, referenceType }) {
@@ -8,6 +10,17 @@ const Notification = {
        RETURNING *`,
       [userId, type, title, message || null, referenceId || null, referenceType || null]
     );
+
+    // Send web push notification (non-blocking)
+    if (PushService) {
+      PushService.sendToUser(userId, {
+        title: title || 'Duozz Flow',
+        body: message || '',
+        icon: '/icons/Icon-192.png',
+        data: { type, referenceId, referenceType },
+      }).catch(err => console.error('Push send error:', err.message));
+    }
+
     return rows[0];
   },
 

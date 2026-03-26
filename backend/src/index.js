@@ -31,6 +31,7 @@ const reviewRoutes = require('./routes/reviews');
 const chatRoutes = require('./routes/chat');
 const calendarRoutes = require('./routes/calendar');
 const driveRoutes = require('./routes/drive');
+const pushRoutes = require('./routes/push');
 
 const app = express();
 const server = http.createServer(app);
@@ -175,6 +176,9 @@ app.use('/api/v1', calendarRoutes);
 
 // Google Drive Integration
 app.use('/api/v1', driveRoutes);
+
+// Push Notifications
+app.use('/api/v1/push', pushRoutes);
 
 // =============================================================
 

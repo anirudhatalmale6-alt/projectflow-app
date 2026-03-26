@@ -3,6 +3,13 @@ import '../models/project.dart';
 import '../models/user.dart';
 import 'api_service.dart';
 
+int _toInt(dynamic v) {
+  if (v == null) return 0;
+  if (v is int) return v;
+  if (v is double) return v.toInt();
+  return int.tryParse(v.toString()) ?? 0;
+}
+
 class ProjectService {
   final ApiService _api = ApiService();
 
@@ -28,20 +35,21 @@ class ProjectService {
     final projectJson = Map<String, dynamic>.from(data['project'] ?? data);
 
     // Merge stats into project JSON so Project.fromJson can parse them
+    // MySQL SUM(CASE...) returns strings, so force int conversion
     if (data['stats'] != null) {
       final stats = data['stats'];
       if (stats['tasks'] != null) {
         final t = stats['tasks'];
         projectJson['task_stats'] = {
-          'total': t['total_tasks'] ?? 0,
-          'todo': t['todo'] ?? 0,
-          'in_progress': t['in_progress'] ?? 0,
-          'review': t['review'] ?? 0,
-          'done': t['done'] ?? 0,
+          'total': _toInt(t['total_tasks']),
+          'todo': _toInt(t['todo']),
+          'in_progress': _toInt(t['in_progress']),
+          'review': _toInt(t['review']),
+          'done': _toInt(t['done']),
         };
       }
       if (stats['deliveries'] != null) {
-        projectJson['delivery_count'] = stats['deliveries']['total_deliveries'] ?? 0;
+        projectJson['delivery_count'] = _toInt(stats['deliveries']['total_deliveries']);
       }
     }
     if (data['members'] != null) {

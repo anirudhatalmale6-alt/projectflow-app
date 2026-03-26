@@ -63,14 +63,23 @@ const Project = {
     const values = [];
     let paramIndex = 1;
 
-    // If user is not admin/manager, only show projects they are a member of
+    // Role-based project visibility:
+    // - Admin: sees all projects
+    // - Manager: sees all projects (like admin)
+    // - Editor/Freelancer: sees projects where they are members or have assigned tasks
+    // - Client: sees projects linked to their client record
     if (userId && userRole !== 'admin' && userRole !== 'manager') {
       if (userRole === 'client') {
-        // Clients see projects linked to their client record
         conditions.push(`p.client_id IN (SELECT id FROM clients WHERE email = (SELECT email FROM users WHERE id = $${paramIndex}))`);
         values.push(userId);
         paramIndex++;
+      } else if (userRole === 'editor') {
+        // Editors see projects they are members of OR have tasks assigned to them
+        conditions.push(`(p.id IN (SELECT project_id FROM project_members WHERE user_id = $${paramIndex}) OR p.id IN (SELECT project_id FROM tasks WHERE assignee_id = $${paramIndex} AND deleted_at IS NULL))`);
+        values.push(userId);
+        paramIndex++;
       } else {
+        // Freelancer: see projects they are members of
         conditions.push(`p.id IN (SELECT project_id FROM project_members WHERE user_id = $${paramIndex})`);
         values.push(userId);
         paramIndex++;
@@ -209,7 +218,7 @@ const Project = {
          COUNT(*) FILTER (WHERE due_date < NOW() AND status != 'done')::int AS overdue,
          COALESCE(SUM(estimated_hours), 0)::numeric AS total_estimated_hours,
          COALESCE(SUM(actual_hours), 0)::numeric AS total_actual_hours
-       FROM tasks WHERE project_id = $1`,
+       FROM tasks WHERE project_id = $1 AND deleted_at IS NULL`,
       [projectId]
     );
 
@@ -220,13 +229,19 @@ const Project = {
          COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected,
          COUNT(*) FILTER (WHERE status = 'in_review')::int AS in_review,
          COUNT(*) FILTER (WHERE status = 'revision_requested')::int AS revision_requested
-       FROM delivery_jobs WHERE project_id = $1`,
+       FROM delivery_jobs WHERE project_id = $1 AND deleted_at IS NULL`,
+      [projectId]
+    );
+
+    const memberStats = await pool.query(
+      `SELECT COUNT(*)::int AS total_members FROM project_members WHERE project_id = $1`,
       [projectId]
     );
 
     return {
       tasks: taskStats.rows[0],
       deliveries: deliveryStats.rows[0],
+      members: memberStats.rows[0],
     };
   },
 

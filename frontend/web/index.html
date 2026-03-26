@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Duozz Flow - Modern Project Management">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Duozz Flow">
   <link rel="manifest" href="manifest.json">
@@ -49,14 +49,85 @@
     <p>Loading Duozz Flow...</p>
   </div>
   <script>
-    // Disable service worker caching for development
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (let registration of registrations) {
-          registration.unregister();
+    // Aggressively clear all service workers and caches before loading Flutter
+    (async function() {
+      if ('serviceWorker' in navigator) {
+        var regs = await navigator.serviceWorker.getRegistrations();
+        for (var r of regs) { await r.unregister(); }
+      }
+      if ('caches' in window) {
+        var names = await caches.keys();
+        for (var n of names) { await caches.delete(n); }
+      }
+    })();
+
+    // Notification sound system
+    window._notifAudioCtx = null;
+    window._notifUnlocked = false;
+
+    // Unlock audio on first user interaction (required by browsers)
+    function _unlockAudio() {
+      if (window._notifUnlocked) return;
+      try {
+        if (!window._notifAudioCtx) {
+          window._notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-      });
+        if (window._notifAudioCtx.state === 'suspended') {
+          window._notifAudioCtx.resume();
+        }
+        // Create a silent buffer to fully unlock
+        var buf = window._notifAudioCtx.createBuffer(1, 1, 22050);
+        var src = window._notifAudioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(window._notifAudioCtx.destination);
+        src.start(0);
+        window._notifUnlocked = true;
+      } catch(e) {}
     }
+    document.addEventListener('click', _unlockAudio, {once: false});
+    document.addEventListener('touchstart', _unlockAudio, {once: false});
+    document.addEventListener('keydown', _unlockAudio, {once: false});
+
+    // Play notification sound - called from Flutter via JS interop
+    window.playDuozzNotificationSound = function() {
+      try {
+        if (!window._notifAudioCtx) {
+          window._notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        var ctx = window._notifAudioCtx;
+        if (ctx.state === 'suspended') { ctx.resume(); }
+        var now = ctx.currentTime;
+
+        // Tone 1: 800Hz
+        var o1 = ctx.createOscillator();
+        var g1 = ctx.createGain();
+        o1.connect(g1); g1.connect(ctx.destination);
+        o1.frequency.value = 800; o1.type = 'sine';
+        g1.gain.setValueAtTime(0.5, now);
+        g1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+        o1.start(now); o1.stop(now + 0.15);
+
+        // Tone 2: 1000Hz
+        var o2 = ctx.createOscillator();
+        var g2 = ctx.createGain();
+        o2.connect(g2); g2.connect(ctx.destination);
+        o2.frequency.value = 1000; o2.type = 'sine';
+        g2.gain.setValueAtTime(0.5, now + 0.2);
+        g2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        o2.start(now + 0.2); o2.stop(now + 0.35);
+
+        // Tone 3: 1200Hz
+        var o3 = ctx.createOscillator();
+        var g3 = ctx.createGain();
+        o3.connect(g3); g3.connect(ctx.destination);
+        o3.frequency.value = 1200; o3.type = 'sine';
+        g3.gain.setValueAtTime(0.4, now + 0.4);
+        g3.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+        o3.start(now + 0.4); o3.stop(now + 0.55);
+      } catch(e) {
+        console.warn('Notification sound failed:', e);
+      }
+    };
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

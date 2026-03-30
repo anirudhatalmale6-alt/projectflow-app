@@ -62,8 +62,13 @@ setupSocket(io);
 // Trust proxy (Cloudflare tunnel)
 app.set('trust proxy', 1);
 
-// Gzip compression for faster loading
-app.use(compression());
+// Gzip compression - skip for API JSON responses (fixes iOS gzip decode issue)
+app.use(compression({
+  filter: (req, res) => {
+    if (req.path.startsWith('/api/')) return false;
+    return compression.filter(req, res);
+  }
+}));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

@@ -114,7 +114,9 @@ router.post('/apns/register', async (req, res, next) => {
       return res.status(400).json({ error: 'Device token is required.' });
     }
 
+    console.log(`[APNs Route] Register request from user ${req.user.id}, token length: ${token.length}, platform: ${platform || 'ios'}`);
     await ApnsService.saveToken(req.user.id, token, platform || 'ios');
+    console.log(`[APNs Route] Token registered successfully for user ${req.user.id}`);
     res.json({ message: 'APNs device token registered.' });
   } catch (err) {
     next(err);

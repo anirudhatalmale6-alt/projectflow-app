@@ -39,12 +39,16 @@ const ApnsService = {
    * Save a device token for a user
    */
   async saveToken(userId, token, platform) {
+    console.log(`[APNs] Registering token for user ${userId}, platform: ${platform || 'ios'}, token: ${token.substring(0, 20)}...`);
     await pool.query('DELETE FROM fcm_tokens WHERE token = $1', [token]);
     await pool.query(
       `INSERT INTO fcm_tokens (user_id, token, platform)
        VALUES ($1, $2, $3)`,
       [userId, token, platform || 'ios']
     );
+    // Verify it was saved
+    const { rows } = await pool.query('SELECT COUNT(*) as count FROM fcm_tokens WHERE user_id = $1', [userId]);
+    console.log(`[APNs] Token saved OK. User ${userId} now has ${rows[0].count} registered token(s).`);
   },
 
   /**
@@ -90,6 +94,10 @@ const ApnsService = {
         };
 
         const result = await apnProvider.send(note, row.token);
+
+        if (result.sent && result.sent.length > 0) {
+          console.log(`[APNs] SUCCESS - Push sent to user ${userId}, token: ${row.token.substring(0, 20)}..., title: "${payload.title}", body: "${payload.body}"`);
+        }
 
         if (result.failed && result.failed.length > 0) {
           for (const fail of result.failed) {

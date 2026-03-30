@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.duozzflow.app</string>
+	<string>com.duozz.flow</string>
 	<key>PROJECT_ID</key>
 	<string>duozzflow</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:844915658490:ios:205e54fe13f83aa73d4343</string>
+	<string>1:844915658490:ios:8c488f07bbdc31503d4343</string>
 </dict>
 </plist>

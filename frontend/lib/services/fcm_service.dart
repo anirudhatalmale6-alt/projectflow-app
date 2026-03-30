@@ -100,7 +100,7 @@ class FcmService {
 
   Future<void> _sendFcmTokenToServer(String token) async {
     try {
-      await _api.post(ApiConfig.fcmRegister, {
+      await _api.post(ApiConfig.fcmRegister, body: {
         'token': token,
         'platform': Platform.isIOS ? 'ios' : 'android',
       });
@@ -112,7 +112,7 @@ class FcmService {
 
   Future<void> _sendApnsTokenToServer(String token) async {
     try {
-      await _api.post(ApiConfig.apnsRegister, {
+      await _api.post(ApiConfig.apnsRegister, body: {
         'token': token,
         'platform': 'ios',
       });
@@ -127,10 +127,10 @@ class FcmService {
     if (kIsWeb) return;
     try {
       if (_apnsToken != null) {
-        await _api.post(ApiConfig.apnsUnregister, {'token': _apnsToken});
+        await _api.post(ApiConfig.apnsUnregister, body: {'token': _apnsToken});
       }
       if (_currentToken != null) {
-        await _api.post(ApiConfig.fcmUnregister, {'token': _currentToken});
+        await _api.post(ApiConfig.fcmUnregister, body: {'token': _currentToken});
       }
     } catch (_) {}
   }

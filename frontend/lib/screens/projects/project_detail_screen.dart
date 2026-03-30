@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../models/project.dart';
@@ -1271,6 +1272,51 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
   bool _expanded = false;
   static const int _maxChars = 200;
 
+  static final _urlRegex = RegExp(
+    r'(https?://[^\s<>\"\)]+)',
+    caseSensitive: false,
+  );
+
+  List<InlineSpan> _buildTextSpans(String text) {
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+
+    for (final match in _urlRegex.allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastEnd, match.start),
+          style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary, height: 1.5),
+        ));
+      }
+      final url = match.group(0)!;
+      spans.add(WidgetSpan(
+        child: GestureDetector(
+          onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+          child: Text(
+            url,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.primaryColor,
+              height: 1.5,
+              decoration: TextDecoration.underline,
+              decorationColor: AppTheme.primaryColor,
+            ),
+          ),
+        ),
+      ));
+      lastEnd = match.end;
+    }
+
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastEnd),
+        style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary, height: 1.5),
+      ));
+    }
+
+    return spans;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLong = widget.description.length > _maxChars;
@@ -1307,12 +1353,9 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              displayText,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppTheme.textPrimary,
-                height: 1.5,
+            RichText(
+              text: TextSpan(
+                children: _buildTextSpans(displayText),
               ),
             ),
             if (isLong)

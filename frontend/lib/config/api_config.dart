@@ -144,6 +144,10 @@ class ApiConfig {
   static const String adminStats = '$apiPrefix/admin/stats';
   static const String adminAuditLog = '$apiPrefix/admin/audit-log';
 
+  // FCM Push Notifications (mobile)
+  static const String fcmRegister = '$apiPrefix/push/fcm/register';
+  static const String fcmUnregister = '$apiPrefix/push/fcm/unregister';
+
   // Users (public - any authenticated user)
   static const String allUsers = '$apiPrefix/users';
 }

@@ -1,6 +1,8 @@
 const pool = require('../config/database');
 let PushService;
 try { PushService = require('../services/pushService'); } catch (e) { PushService = null; }
+let FcmService;
+try { FcmService = require('../services/fcmService'); } catch (e) { FcmService = null; }
 
 const Notification = {
   async create({ userId, type, title, message, referenceId, referenceType }) {
@@ -19,6 +21,17 @@ const Notification = {
         icon: '/icons/Icon-192.png',
         data: { type, referenceId, referenceType },
       }).catch(err => console.error('Push send error:', err.message));
+    }
+
+    // Send FCM push notification to mobile (non-blocking)
+    if (FcmService) {
+      FcmService.sendToUser(userId, {
+        title: title || 'Duozz Flow',
+        body: message || '',
+        type: type || 'general',
+        route: referenceType === 'task' ? '/tasks/detail' : referenceType === 'project' ? '/projects/detail' : '',
+        routeArgs: referenceId || '',
+      }).catch(err => console.error('FCM send error:', err.message));
     }
 
     return rows[0];
@@ -43,6 +56,20 @@ const Notification = {
        RETURNING *`,
       params
     );
+
+    // Send FCM push to all recipients (non-blocking)
+    if (FcmService) {
+      for (const n of notifications) {
+        FcmService.sendToUser(n.userId, {
+          title: n.title || 'Duozz Flow',
+          body: n.message || '',
+          type: n.type || 'general',
+          route: n.referenceType === 'task' ? '/tasks/detail' : n.referenceType === 'project' ? '/projects/detail' : '',
+          routeArgs: n.referenceId || '',
+        }).catch(err => console.error('FCM bulk send error:', err.message));
+      }
+    }
+
     return rows;
   },
 

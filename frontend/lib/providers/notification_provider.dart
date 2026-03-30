@@ -4,6 +4,7 @@ import '../models/notification.dart';
 import '../services/notification_service.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../services/fcm_service.dart';
 import '../utils/notification_sound_stub.dart'
     if (dart.library.html) '../utils/notification_sound_web.dart';
 
@@ -30,6 +31,11 @@ class NotificationProvider with ChangeNotifier {
     if (kIsWeb) {
       try {
         initPushNotifications(authToken);
+      } catch (_) {}
+    } else {
+      // Mobile: register FCM token with backend
+      try {
+        FcmService().registerToken();
       } catch (_) {}
     }
   }

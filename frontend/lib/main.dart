@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'config/api_config.dart';
+import 'services/fcm_service.dart';
 import 'config/theme.dart';
 import 'services/api_service.dart';
 import 'providers/auth_provider.dart';
@@ -51,6 +54,18 @@ void main() async {
   } catch (_) {
     // Ignore config load errors, will use defaults
   }
+
+  // Initialize Firebase for mobile push notifications
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      await FcmService().initialize();
+    } catch (e) {
+      // Firebase not available on this platform - continue without it
+    }
+  }
+
   runApp(const DuozzFlowApp());
 }
 

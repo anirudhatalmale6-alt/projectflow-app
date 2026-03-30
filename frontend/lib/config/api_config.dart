@@ -148,6 +148,10 @@ class ApiConfig {
   static const String fcmRegister = '$apiPrefix/push/fcm/register';
   static const String fcmUnregister = '$apiPrefix/push/fcm/unregister';
 
+  // APNs Push Notifications (iOS direct)
+  static const String apnsRegister = '$apiPrefix/push/apns/register';
+  static const String apnsUnregister = '$apiPrefix/push/apns/unregister';
+
   // Users (public - any authenticated user)
   static const String allUsers = '$apiPrefix/users';
 }

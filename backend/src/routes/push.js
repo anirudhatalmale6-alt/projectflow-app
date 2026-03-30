@@ -2,6 +2,7 @@ const express = require('express');
 const auth = require('../middleware/auth');
 const PushService = require('../services/pushService');
 const FcmService = require('../services/fcmService');
+const ApnsService = require('../services/apnsService');
 
 const router = express.Router();
 
@@ -98,6 +99,52 @@ router.post('/fcm/test', async (req, res, next) => {
       type: 'test',
     });
     res.json({ message: 'Test FCM push sent.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ======= APNs (Direct iOS Push) =======
+
+// POST /api/v1/push/apns/register - register APNs device token
+router.post('/apns/register', async (req, res, next) => {
+  try {
+    const { token, platform } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Device token is required.' });
+    }
+
+    await ApnsService.saveToken(req.user.id, token, platform || 'ios');
+    res.json({ message: 'APNs device token registered.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/push/apns/unregister - remove APNs device token
+router.post('/apns/unregister', async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Device token is required.' });
+    }
+
+    await ApnsService.removeToken(token);
+    res.json({ message: 'APNs device token removed.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/push/apns/test - send a test APNs push
+router.post('/apns/test', async (req, res, next) => {
+  try {
+    await ApnsService.sendToUser(req.user.id, {
+      title: 'Duozz Flow',
+      body: 'Push notifications iOS funcionando!',
+      type: 'test',
+    });
+    res.json({ message: 'Test APNs push sent.' });
   } catch (err) {
     next(err);
   }

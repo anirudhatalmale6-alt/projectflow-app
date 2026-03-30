@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -8,7 +9,6 @@ import '../config/api_config.dart';
 /// Background message handler - must be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Firebase is already initialized by the time this is called
   debugPrint('[FCM] Background message: ${message.notification?.title}');
 }
 
@@ -24,8 +24,10 @@ class FcmService {
 
   bool _initialized = false;
   String? _currentToken;
+  String? _apnsToken;
 
   String? get currentToken => _currentToken;
+  String? get apnsToken => _apnsToken;
 
   /// Initialize FCM for mobile platforms
   Future<void> initialize() async {
@@ -47,14 +49,24 @@ class FcmService {
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional) {
-      // Get FCM token
-      _currentToken = await _messaging.getToken();
-      debugPrint('[FCM] Token: $_currentToken');
+      // On iOS, get the raw APNs device token for direct APNs sending
+      if (Platform.isIOS) {
+        _apnsToken = await _messaging.getAPNSToken();
+        debugPrint('[FCM] APNs token: $_apnsToken');
+      }
+
+      // Also try to get FCM token (may fail on iOS if Firebase Console APNs not configured)
+      try {
+        _currentToken = await _messaging.getToken();
+        debugPrint('[FCM] FCM Token: $_currentToken');
+      } catch (e) {
+        debugPrint('[FCM] Could not get FCM token (expected on iOS without APNs config): $e');
+      }
 
       // Listen for token refresh
       _messaging.onTokenRefresh.listen((newToken) {
         _currentToken = newToken;
-        _sendTokenToServer(newToken);
+        _sendFcmTokenToServer(newToken);
       });
 
       // Foreground messages
@@ -71,31 +83,55 @@ class FcmService {
     }
   }
 
-  /// Send FCM token to backend after user login
+  /// Send tokens to backend after user login
   Future<void> registerToken() async {
-    if (kIsWeb || _currentToken == null) return;
-    await _sendTokenToServer(_currentToken!);
-  }
+    if (kIsWeb) return;
 
-  Future<void> _sendTokenToServer(String token) async {
-    try {
-      await _api.post(ApiConfig.fcmRegister, {
-        'token': token,
-        'platform': 'ios',
-      });
-      debugPrint('[FCM] Token registered with server');
-    } catch (e) {
-      debugPrint('[FCM] Failed to register token: $e');
+    // Register APNs token for direct iOS push (primary for iOS)
+    if (Platform.isIOS && _apnsToken != null) {
+      await _sendApnsTokenToServer(_apnsToken!);
+    }
+
+    // Also register FCM token if available (for Android or as backup)
+    if (_currentToken != null) {
+      await _sendFcmTokenToServer(_currentToken!);
     }
   }
 
-  /// Unregister token on logout
-  Future<void> unregisterToken() async {
-    if (kIsWeb || _currentToken == null) return;
+  Future<void> _sendFcmTokenToServer(String token) async {
     try {
-      await _api.post(ApiConfig.fcmUnregister, {
-        'token': _currentToken,
+      await _api.post(ApiConfig.fcmRegister, {
+        'token': token,
+        'platform': Platform.isIOS ? 'ios' : 'android',
       });
+      debugPrint('[FCM] FCM token registered with server');
+    } catch (e) {
+      debugPrint('[FCM] Failed to register FCM token: $e');
+    }
+  }
+
+  Future<void> _sendApnsTokenToServer(String token) async {
+    try {
+      await _api.post(ApiConfig.apnsRegister, {
+        'token': token,
+        'platform': 'ios',
+      });
+      debugPrint('[FCM] APNs token registered with server');
+    } catch (e) {
+      debugPrint('[FCM] Failed to register APNs token: $e');
+    }
+  }
+
+  /// Unregister tokens on logout
+  Future<void> unregisterToken() async {
+    if (kIsWeb) return;
+    try {
+      if (_apnsToken != null) {
+        await _api.post(ApiConfig.apnsUnregister, {'token': _apnsToken});
+      }
+      if (_currentToken != null) {
+        await _api.post(ApiConfig.fcmUnregister, {'token': _currentToken});
+      }
     } catch (_) {}
   }
 
@@ -114,7 +150,6 @@ class FcmService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
-        // Handle notification tap from local notification
         if (response.payload != null) {
           _navigateFromPayload(response.payload!);
         }
@@ -140,7 +175,6 @@ class FcmService {
     final notification = message.notification;
     if (notification == null) return;
 
-    // Show local notification since app is in foreground
     _localNotifications.show(
       message.hashCode,
       notification.title ?? 'Duozz Flow',
@@ -164,8 +198,6 @@ class FcmService {
 
   void _handleMessageTap(RemoteMessage message) {
     debugPrint('[FCM] Message tap: ${message.data}');
-    // Navigation will be handled by the app's navigation system
-    // The data payload should contain route info
     final data = message.data;
     if (data.containsKey('route')) {
       _navigateFromPayload(jsonEncode(data));
@@ -177,7 +209,6 @@ class FcmService {
       final data = jsonDecode(payload) as Map<String, dynamic>;
       final route = data['route'] as String?;
       if (route != null) {
-        // Store the route for the app to pick up on next frame
         _pendingRoute = route;
         _pendingRouteArgs = data['route_args'] as String?;
       }

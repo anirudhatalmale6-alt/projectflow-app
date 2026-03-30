@@ -3,6 +3,8 @@ let PushService;
 try { PushService = require('../services/pushService'); } catch (e) { PushService = null; }
 let FcmService;
 try { FcmService = require('../services/fcmService'); } catch (e) { FcmService = null; }
+let ApnsService;
+try { ApnsService = require('../services/apnsService'); } catch (e) { ApnsService = null; }
 
 const Notification = {
   async create({ userId, type, title, message, referenceId, referenceType }) {
@@ -32,6 +34,17 @@ const Notification = {
         route: referenceType === 'task' ? '/tasks/detail' : referenceType === 'project' ? '/projects/detail' : '',
         routeArgs: referenceId || '',
       }).catch(err => console.error('FCM send error:', err.message));
+    }
+
+    // Send APNs push notification to iOS (non-blocking)
+    if (ApnsService) {
+      ApnsService.sendToUser(userId, {
+        title: title || 'Duozz Flow',
+        body: message || '',
+        type: type || 'general',
+        route: referenceType === 'task' ? '/tasks/detail' : referenceType === 'project' ? '/projects/detail' : '',
+        routeArgs: referenceId || '',
+      }).catch(err => console.error('APNs send error:', err.message));
     }
 
     return rows[0];
@@ -67,6 +80,19 @@ const Notification = {
           route: n.referenceType === 'task' ? '/tasks/detail' : n.referenceType === 'project' ? '/projects/detail' : '',
           routeArgs: n.referenceId || '',
         }).catch(err => console.error('FCM bulk send error:', err.message));
+      }
+    }
+
+    // Send APNs push to all recipients (non-blocking)
+    if (ApnsService) {
+      for (const n of notifications) {
+        ApnsService.sendToUser(n.userId, {
+          title: n.title || 'Duozz Flow',
+          body: n.message || '',
+          type: n.type || 'general',
+          route: n.referenceType === 'task' ? '/tasks/detail' : n.referenceType === 'project' ? '/projects/detail' : '',
+          routeArgs: n.referenceId || '',
+        }).catch(err => console.error('APNs bulk send error:', err.message));
       }
     }
 

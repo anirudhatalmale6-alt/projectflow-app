@@ -55,18 +55,31 @@ void main() async {
     // Ignore config load errors, will use defaults
   }
 
-  // Initialize Firebase for mobile push notifications
-  if (!kIsWeb) {
-    try {
-      await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-      await FcmService().initialize();
-    } catch (e) {
-      // Firebase not available on this platform - continue without it
-    }
-  }
-
   runApp(const DuozzFlowApp());
+
+  // Initialize Firebase for mobile push notifications AFTER app starts
+  // so it never blocks the UI even if it fails
+  if (!kIsWeb) {
+    _initFirebase();
+  }
+}
+
+Future<void> _initFirebase() async {
+  try {
+    // ignore: avoid_print
+    print('[Main] Initializing Firebase...');
+    await Firebase.initializeApp();
+    // ignore: avoid_print
+    print('[Main] Firebase initialized OK');
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    await FcmService().initialize();
+    // ignore: avoid_print
+    print('[Main] FCM initialized OK');
+  } catch (e, stack) {
+    // ignore: avoid_print
+    print('[Main] Firebase init error: $e\n$stack');
+    // Continue without push notifications
+  }
 }
 
 class DuozzFlowApp extends StatefulWidget {

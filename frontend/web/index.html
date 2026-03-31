@@ -209,7 +209,19 @@
       }
     };
   </script>
-  <a href="/privacy" style="position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:#64748B;font-size:11px;font-family:sans-serif;text-decoration:underline;z-index:1;">Pol&iacute;tica de Privacidade</a>
+  <a href="/privacy" id="privacy-link" style="position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:#64748B;font-size:11px;font-family:sans-serif;text-decoration:underline;z-index:1;">Pol&iacute;tica de Privacidade</a>
+  <script>
+    // Hide privacy link once Flutter app loads (only visible on splash/login)
+    window.addEventListener('flutter-first-frame', function() {
+      var pl = document.getElementById('privacy-link');
+      if (pl) pl.style.display = 'none';
+    });
+    // Fallback: hide after 5 seconds if event doesn't fire
+    setTimeout(function() {
+      var pl = document.getElementById('privacy-link');
+      if (pl) pl.style.display = 'none';
+    }, 5000);
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

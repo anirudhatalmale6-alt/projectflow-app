@@ -23,7 +23,7 @@ async function checkDeadlines(io) {
           WHERE n.reference_id = p.id
             AND n.reference_type = 'project'
             AND n.type = 'deadline_overdue'
-            AND n.created_at > NOW() - INTERVAL '24 hours'
+            AND n.created_at > NOW() - INTERVAL 30 MINUTE
         )
       GROUP BY p.id, p.name, p.deadline
     `);
@@ -63,7 +63,7 @@ async function checkDeadlines(io) {
           WHERE n.reference_id = p.id
             AND n.reference_type = 'project'
             AND n.type = 'deadline_approaching'
-            AND n.created_at > NOW() - INTERVAL '24 hours'
+            AND n.created_at > NOW() - INTERVAL 30 MINUTE
         )
       GROUP BY p.id, p.name, p.deadline
     `);
@@ -102,7 +102,7 @@ async function checkDeadlines(io) {
           WHERE n.reference_id = t.id
             AND n.reference_type = 'task'
             AND n.type = 'deadline_overdue'
-            AND n.created_at > NOW() - INTERVAL '24 hours'
+            AND n.created_at > NOW() - INTERVAL 30 MINUTE
         )
     `);
 
@@ -144,7 +144,7 @@ async function checkDeadlines(io) {
           WHERE n.reference_id = t.id
             AND n.reference_type = 'task'
             AND n.type = 'deadline_approaching'
-            AND n.created_at > NOW() - INTERVAL '24 hours'
+            AND n.created_at > NOW() - INTERVAL 30 MINUTE
         )
     `);
 

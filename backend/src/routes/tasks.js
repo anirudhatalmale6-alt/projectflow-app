@@ -412,6 +412,12 @@ router.put('/tasks/:id', async (req, res, next) => {
     const { assigneeIds } = req.body;
     if (assigneeIds && Array.isArray(assigneeIds)) {
       try {
+        // Get current assignees before changing
+        const { rows: oldAssignees } = await pool.query(
+          'SELECT user_id FROM task_assignees WHERE task_id = $1', [req.params.id]
+        );
+        const oldIds = new Set(oldAssignees.map(a => a.user_id));
+
         // Remove all existing assignees and re-add
         await pool.query('DELETE FROM task_assignees WHERE task_id = $1', [req.params.id]);
         for (const uid of assigneeIds) {
@@ -425,6 +431,31 @@ router.put('/tasks/:id', async (req, res, next) => {
           await pool.query('UPDATE tasks SET assignee_id = $1 WHERE id = $2', [assigneeIds[0], req.params.id]);
         } else {
           await pool.query('UPDATE tasks SET assignee_id = NULL WHERE id = $1', [req.params.id]);
+        }
+
+        // Notify NEW assignees (not previously assigned)
+        const newAssignees = assigneeIds.filter(uid => !oldIds.has(uid) && uid !== req.user.id);
+        if (newAssignees.length > 0) {
+          const project = await Project.findById(task.project_id);
+          const assignNotifs = newAssignees.map(uid => ({
+            userId: uid,
+            type: 'task_assigned',
+            title: `Tarefa atribuída: "${updated.title || task.title}"`,
+            message: `${req.user.name} atribuiu a tarefa "${updated.title || task.title}" para você no projeto "${project ? project.name : ''}".`,
+            referenceId: req.params.id,
+            referenceType: 'task',
+          }));
+          await Notification.createBulk(assignNotifs);
+          const io = req.app.get('io');
+          if (io) {
+            for (const uid of newAssignees) {
+              io.to(`user:${uid}`).emit('notification', {
+                type: 'task_assigned',
+                title: `Tarefa atribuída: "${updated.title || task.title}"`,
+                task_id: req.params.id,
+              });
+            }
+          }
         }
       } catch (assigneeErr) {
         console.error('Failed to sync task assignees on update:', assigneeErr.message, assigneeErr.stack);

@@ -64,7 +64,6 @@ class TaskProvider with ChangeNotifier {
   Future<Task?> createTask(Map<String, dynamic> data) async {
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
 
     try {
       final task = await _taskService.createTask(data);

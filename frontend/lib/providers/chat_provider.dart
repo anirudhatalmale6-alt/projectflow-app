@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/chat_channel.dart';
 import '../models/chat_message.dart';
@@ -18,6 +19,7 @@ class ChatProvider with ChangeNotifier {
   bool _loadingMessages = false;
   String? _errorMessage;
   String? _typingUser;
+  Timer? _typingTimer;
   bool _listenersSetUp = false;
 
   List<ChatChannel> get channels => _channels;
@@ -53,10 +55,13 @@ class ChatProvider with ChangeNotifier {
     _socket.on('user_typing', (data) {
       if (data == null) return;
       try {
-        _typingUser = data['user_name'] as String?;
+        final name = data['user_name'] as String?;
+        if (_typingUser == name) return; // already showing this user typing
+        _typingUser = name;
         notifyListeners();
-        Future.delayed(const Duration(seconds: 3), () {
-          if (_typingUser == data['user_name']) {
+        _typingTimer?.cancel();
+        _typingTimer = Timer(const Duration(seconds: 3), () {
+          if (_typingUser == name) {
             _typingUser = null;
             notifyListeners();
           }

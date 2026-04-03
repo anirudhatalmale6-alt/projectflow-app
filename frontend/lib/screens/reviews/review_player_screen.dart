@@ -97,8 +97,14 @@ class _ReviewPlayerScreenState extends State<ReviewPlayerScreen> {
     }
   }
 
+  DateTime? _lastTimecodeUpdate;
+
   void _onVideoPositionChanged() {
     if (_videoController == null || !_videoController!.value.isInitialized) return;
+    // Throttle to max 4 updates per second
+    final now = DateTime.now();
+    if (_lastTimecodeUpdate != null && now.difference(_lastTimecodeUpdate!).inMilliseconds < 250) return;
+    _lastTimecodeUpdate = now;
     final pos = _videoController!.value.position;
     final tc = _formatDuration(pos);
     if (tc != _currentTimecode && mounted) {
